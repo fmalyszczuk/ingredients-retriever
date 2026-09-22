@@ -94,6 +94,29 @@ class IngredientLineParserTest {
     }
 
     @Test
+    void parse_stripsNestedParentheticals() {
+        ParsedIngredientLine result = parser.parse("1 onion (, finely chopped (brown, yellow or white))");
+
+        assertEquals("onion", result.name());
+        assertEquals(0, BigDecimal.valueOf(1).compareTo(result.quantity()));
+    }
+
+    @Test
+    void parse_stripsDoublyNestedParentheticals_leavingNoEmptyShell() {
+        ParsedIngredientLine result = parser.parse("1/2 cup (125 ml) dry red wine ((sub water or beef broth/stock))");
+
+        assertEquals("dry red wine", result.name());
+    }
+
+    @Test
+    void parse_stripsMultipleAdjacentParentheticalGroups() {
+        ParsedIngredientLine result = parser.parse("2 beef bouillon cubes (, crumbled OR granulated beef bouillon (Note 2))");
+
+        assertEquals("beef bouillon cubes", result.name());
+        assertEquals(0, BigDecimal.valueOf(2).compareTo(result.quantity()));
+    }
+
+    @Test
     void parse_returnsWholeLineUnparsed_whenNoLeadingQuantity() {
         ParsedIngredientLine result = parser.parse("a pinch of salt");
 

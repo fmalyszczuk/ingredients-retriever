@@ -84,8 +84,15 @@ public class IngredientLineParser {
      * and otherwise prevent the same ingredient from merging across recipes on the shopping list.
      */
     private String stripParentheticals(String text) {
-        String stripped = PARENTHETICAL_PATTERN.matcher(text).replaceAll("").trim();
-        return stripped.isEmpty() ? text : stripped;
+        String current = text;
+        String previous;
+        do {
+            previous = current;
+            current = PARENTHETICAL_PATTERN.matcher(current).replaceAll("").trim();
+        } while (!current.equals(previous));
+
+        current = current.replaceAll("\\s{2,}", " ").trim();
+        return current.isEmpty() ? text : current;
     }
 
     private BigDecimal parseQuantity(String token) {
