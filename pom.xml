@@ -9,9 +9,9 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.malyszczuk</groupId>
-	<artifactId>ingredients-retriever</artifactId>
+	<artifactId>pantrypal-backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name/>
+	<name>pantrypal-backend</name>
 	<description/>
 	<url/>
 	<licenses>
