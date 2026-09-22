@@ -45,6 +45,9 @@ public class IngredientLineParser {
 
     private static final Pattern PARENTHETICAL_PATTERN = Pattern.compile("\\s*\\([^()]*\\)");
 
+    private static final Pattern ALTERNATE_MEASUREMENT_PATTERN =
+            Pattern.compile("^/\\s*\\d+(?:\\.\\d+)?\\s*([a-zA-Z]*)\\s+(.*)$");
+
     public ParsedIngredientLine parse(String line) {
         String trimmed = line.trim();
         Matcher matcher = QUANTITY_PATTERN.matcher(trimmed);
@@ -66,6 +69,7 @@ public class IngredientLineParser {
         }
 
         remainder = stripLeadingOf(remainder);
+        remainder = stripAlternateMeasurement(remainder);
 
         String name = remainder.isEmpty() ? trimmed : remainder;
         return new ParsedIngredientLine(stripParentheticals(name), quantity, unit);
@@ -76,6 +80,26 @@ public class IngredientLineParser {
             return text.substring(3).trim();
         }
         return text;
+    }
+
+    /**
+     * Strips a leading alternate-unit measurement (e.g. "/ 500g" in "1 lb / 500g beef mince"),
+     * which some sites append as an imperial/metric conversion alongside the primary quantity.
+     * Only strips it when the trailing letters look like a recognized unit, to avoid eating
+     * real ingredient text on lines that happen to start with "/" for another reason.
+     */
+    private String stripAlternateMeasurement(String text) {
+        Matcher matcher = ALTERNATE_MEASUREMENT_PATTERN.matcher(text.trim());
+        if (!matcher.matches()) {
+            return text;
+        }
+
+        String unitToken = matcher.group(1);
+        if (!unitToken.isEmpty() && !KNOWN_UNITS.contains(unitToken.toLowerCase(Locale.ROOT))) {
+            return text;
+        }
+
+        return matcher.group(2).trim();
     }
 
     /**

@@ -117,6 +117,33 @@ class IngredientLineParserTest {
     }
 
     @Test
+    void parse_stripsAlternateMetricMeasurement_afterImperialQuantityAndUnit() {
+        ParsedIngredientLine result = parser.parse("1 lb / 500g beef mince (ground beef) (OR half pork, half beef (Note 1))");
+
+        assertEquals("beef mince", result.name());
+        assertEquals(0, BigDecimal.valueOf(1).compareTo(result.quantity()));
+        assertEquals("lb", result.unit());
+    }
+
+    @Test
+    void parse_stripsAlternateMeasurement_whenNoSpaceBetweenQuantityAndOriginalUnit() {
+        ParsedIngredientLine result = parser.parse("800g / 28 oz can crushed tomato ((or tomato passata))");
+
+        assertEquals("can crushed tomato", result.name());
+        assertEquals(0, BigDecimal.valueOf(800).compareTo(result.quantity()));
+        assertEquals("g", result.unit());
+    }
+
+    @Test
+    void parse_leavesTextUnchanged_whenSlashIsNotFollowedByRecognizedAlternateUnit() {
+        ParsedIngredientLine result = parser.parse("2 cans / jars roasted red peppers");
+
+        assertEquals("/ jars roasted red peppers", result.name());
+        assertEquals(0, BigDecimal.valueOf(2).compareTo(result.quantity()));
+        assertEquals("cans", result.unit());
+    }
+
+    @Test
     void parse_returnsWholeLineUnparsed_whenNoLeadingQuantity() {
         ParsedIngredientLine result = parser.parse("a pinch of salt");
 
