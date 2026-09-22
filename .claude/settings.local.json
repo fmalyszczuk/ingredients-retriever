@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./mvnw -q -o compile)",
+      "Bash(./mvnw -q compile)"
+    ]
+  }
+}
