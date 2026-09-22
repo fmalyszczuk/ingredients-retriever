@@ -1,0 +1,75 @@
+package com.malyszczuk.ingredients_retriever.service;
+
+import com.malyszczuk.ingredients_retriever.domain.Ingredient;
+import com.malyszczuk.ingredients_retriever.domain.ShoppingListItem;
+import com.malyszczuk.ingredients_retriever.repository.ShoppingListItemRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+public class ShoppingListService {
+
+    private final ShoppingListItemRepository shoppingListItemRepository;
+
+    @Transactional(readOnly = true)
+    public List<ShoppingListItem> listItems() {
+        return shoppingListItemRepository.findAll();
+    }
+
+    @Transactional
+    public List<ShoppingListItem> addIngredients(List<Ingredient> ingredients) {
+        return ingredients.stream()
+                .map(ingredient -> addItem(ingredient.getName(), ingredient.getQuantity(), ingredient.getUnit()))
+                .toList();
+    }
+
+    @Transactional
+    public ShoppingListItem addItem(String name, BigDecimal quantity, String unit) {
+        String normalizedName = normalize(name);
+        if (normalizedName == null || normalizedName.isEmpty()) {
+            throw new IllegalArgumentException("Ingredient name must not be blank");
+        }
+
+        Optional<ShoppingListItem> existing = shoppingListItemRepository.findByNameIgnoreCase(normalizedName);
+
+        ShoppingListItem item;
+        if (existing.isPresent()) {
+            item = existing.get();
+            item.setQuantity(sumQuantities(item.getQuantity(), quantity));
+            if (item.getUnit() == null) {
+                item.setUnit(normalize(unit));
+            }
+        } else {
+            item = ShoppingListItem.builder()
+                    .name(normalizedName)
+                    .quantity(quantity)
+                    .unit(normalize(unit))
+                    .build();
+        }
+
+        return shoppingListItemRepository.save(item);
+    }
+
+    @Transactional
+    public void removeItem(String name) {
+        shoppingListItemRepository.findByNameIgnoreCase(normalize(name))
+                .ifPresent(shoppingListItemRepository::delete);
+    }
+
+    private BigDecimal sumQuantities(BigDecimal current, BigDecimal addition) {
+        if (current == null || addition == null) {
+            return null;
+        }
+        return current.add(addition);
+    }
+
+    private String normalize(String value) {
+        return value == null ? null : value.trim();
+    }
+}
