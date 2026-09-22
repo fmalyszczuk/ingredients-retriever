@@ -43,12 +43,14 @@ public class IngredientLineParser {
             "pieces", "piece", "pcs", "cloves", "clove", "pinches", "pinch", "cans", "can", "slices", "slice"
     );
 
+    private static final Pattern PARENTHETICAL_PATTERN = Pattern.compile("\\s*\\([^()]*\\)");
+
     public ParsedIngredientLine parse(String line) {
         String trimmed = line.trim();
         Matcher matcher = QUANTITY_PATTERN.matcher(trimmed);
 
         if (!matcher.matches()) {
-            return new ParsedIngredientLine(trimmed, null, null);
+            return new ParsedIngredientLine(stripParentheticals(trimmed), null, null);
         }
 
         BigDecimal quantity = parseQuantity(matcher.group(1));
@@ -65,7 +67,8 @@ public class IngredientLineParser {
 
         remainder = stripLeadingOf(remainder);
 
-        return new ParsedIngredientLine(remainder.isEmpty() ? trimmed : remainder, quantity, unit);
+        String name = remainder.isEmpty() ? trimmed : remainder;
+        return new ParsedIngredientLine(stripParentheticals(name), quantity, unit);
     }
 
     private String stripLeadingOf(String text) {
@@ -73,6 +76,16 @@ public class IngredientLineParser {
             return text.substring(3).trim();
         }
         return text;
+    }
+
+    /**
+     * Removes parenthetical asides (e.g. "(spooned and leveled)", "(for serving)") from an
+     * ingredient name, since they're prep notes rather than part of the ingredient's identity
+     * and otherwise prevent the same ingredient from merging across recipes on the shopping list.
+     */
+    private String stripParentheticals(String text) {
+        String stripped = PARENTHETICAL_PATTERN.matcher(text).replaceAll("").trim();
+        return stripped.isEmpty() ? text : stripped;
     }
 
     private BigDecimal parseQuantity(String token) {

@@ -60,9 +60,28 @@ class IngredientLineParserTest {
     void parse_handlesUnicodeMixedFraction_immediatelyFollowingWholeNumber() {
         ParsedIngredientLine result = parser.parse("1½ cups all-purpose flour (spooned and leveled)");
 
-        assertEquals("all-purpose flour (spooned and leveled)", result.name());
+        assertEquals("all-purpose flour", result.name());
         assertEquals(0, new BigDecimal("1.50").compareTo(result.quantity()));
         assertEquals("cups", result.unit());
+    }
+
+    @Test
+    void parse_stripsParentheticalAside_regardlessOfPositionInName() {
+        ParsedIngredientLine result = parser.parse(
+                "3 tablespoons unsalted butter (melted and cooled slightly, or neutral oil, plus more for the pan)");
+
+        assertEquals("unsalted butter", result.name());
+        assertEquals(0, BigDecimal.valueOf(3).compareTo(result.quantity()));
+        assertEquals("tablespoons", result.unit());
+    }
+
+    @Test
+    void parse_stripsParenthetical_whenLineHasNoLeadingQuantity() {
+        ParsedIngredientLine result = parser.parse("Maple syrup (for serving)");
+
+        assertEquals("Maple syrup", result.name());
+        assertNull(result.quantity());
+        assertNull(result.unit());
     }
 
     @Test
