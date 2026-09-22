@@ -2,7 +2,20 @@
   "permissions": {
     "allow": [
       "Bash(./mvnw -q -o compile)",
-      "Bash(./mvnw -q compile)"
+      "Bash(./mvnw -q compile)",
+      "Bash(./mvnw -q test -Dtest=ShoppingListServiceTest)",
+      "Read(//c/Users/duzys/.m2/repository/org/springframework/boot/spring-boot-test/**)",
+      "Read(//c/Users/duzys/.m2/repository/**)",
+      "Bash(./mvnw -q test -Dtest=ShoppingListControllerTest)",
+      "Bash(./mvnw -q dependency:tree -Dscope=test)",
+      "Bash(./mvnw dependency:tree2)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(./mvnw -q test)",
+      "Bash(echo \"---done, exit $?---\"2)",
+      "Bash(cd *)",
+      "Bash(echo \"MVN_EXIT=$?\")",
+      "Read(//tmp/**)",
+      "Bash(curl *)"
     ]
   }
 }
