@@ -113,6 +113,54 @@ class ShoppingListServiceTest {
     }
 
     @Test
+    void updateItem_recalculatesQuantity_whenOnlyUnitChangesToConvertibleUnit() {
+        ShoppingListItem existing = ShoppingListItem.builder()
+                .name("flour")
+                .quantity(BigDecimal.valueOf(2))
+                .unit("lb")
+                .build();
+        when(shoppingListItemRepository.findByNameIgnoreCase("flour")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShoppingListItem result = shoppingListService.updateItem("flour", null, null, "kg");
+
+        assertEquals("kg", result.getUnit());
+        assertEquals(0, BigDecimal.valueOf(0.907).compareTo(result.getQuantity()));
+    }
+
+    @Test
+    void updateItem_justRelabelsUnit_whenUnitIsNotConvertible() {
+        ShoppingListItem existing = ShoppingListItem.builder()
+                .name("eggs")
+                .quantity(BigDecimal.valueOf(12))
+                .unit("pcs")
+                .build();
+        when(shoppingListItemRepository.findByNameIgnoreCase("eggs")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShoppingListItem result = shoppingListService.updateItem("eggs", null, null, "box");
+
+        assertEquals("box", result.getUnit());
+        assertEquals(0, BigDecimal.valueOf(12).compareTo(result.getQuantity()));
+    }
+
+    @Test
+    void updateItem_setsUnitWithoutConversion_whenNoPriorUnit() {
+        ShoppingListItem existing = ShoppingListItem.builder()
+                .name("salt")
+                .quantity(BigDecimal.valueOf(1))
+                .unit(null)
+                .build();
+        when(shoppingListItemRepository.findByNameIgnoreCase("salt")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShoppingListItem result = shoppingListService.updateItem("salt", null, null, "kg");
+
+        assertEquals("kg", result.getUnit());
+        assertEquals(0, BigDecimal.valueOf(1).compareTo(result.getQuantity()));
+    }
+
+    @Test
     void updateItem_throws_whenItemDoesNotExist() {
         when(shoppingListItemRepository.findByNameIgnoreCase("eggs")).thenReturn(Optional.empty());
 

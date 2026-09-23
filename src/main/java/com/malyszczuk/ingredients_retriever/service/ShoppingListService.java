@@ -66,11 +66,20 @@ public class ShoppingListService {
         if (purchased != null) {
             item.setPurchased(purchased);
         }
+
+        String normalizedUnit = normalize(unit);
         if (quantity != null) {
+            // Caller supplied an explicit quantity: take both values as-is, no conversion.
             item.setQuantity(quantity);
-        }
-        if (unit != null) {
-            item.setUnit(normalize(unit));
+            if (normalizedUnit != null) {
+                item.setUnit(normalizedUnit);
+            }
+        } else if (normalizedUnit != null && !normalizedUnit.equalsIgnoreCase(item.getUnit())) {
+            // Only the unit changed: recalculate the quantity instead of relabelling it 1:1.
+            if (item.getQuantity() != null && unitConverter.supports(item.getUnit()) && unitConverter.supports(normalizedUnit)) {
+                item.setQuantity(unitConverter.convert(item.getQuantity(), item.getUnit(), normalizedUnit));
+            }
+            item.setUnit(normalizedUnit);
         }
 
         return shoppingListItemRepository.save(item);

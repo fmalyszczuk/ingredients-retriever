@@ -30,6 +30,10 @@ public class UnitConverter {
             Map.entry("pounds", BigDecimal.valueOf(453.59237))
     );
 
+    public boolean supports(String unit) {
+        return unit != null && GRAMS_PER_UNIT.containsKey(unit.trim().toLowerCase());
+    }
+
     public BigDecimal convert(BigDecimal quantity, String fromUnit, String toUnit) {
         if (quantity == null) {
             throw new IllegalArgumentException("Quantity to convert must not be null");

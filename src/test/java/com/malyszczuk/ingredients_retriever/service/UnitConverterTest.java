@@ -4,8 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 class UnitConverterTest {
 
@@ -48,5 +47,17 @@ class UnitConverterTest {
     void convert_throws_whenUnitIsUnsupported() {
         assertThrows(IllegalArgumentException.class,
                 () -> unitConverter.convert(BigDecimal.ONE, "lb", "cups"));
+    }
+
+    @Test
+    void supports_recognizesKnownMassUnitsCaseInsensitively() {
+        assertTrue(unitConverter.supports("LB"));
+        assertTrue(unitConverter.supports(" kg "));
+    }
+
+    @Test
+    void supports_rejectsUnknownOrNullUnits() {
+        assertFalse(unitConverter.supports("pcs"));
+        assertFalse(unitConverter.supports(null));
     }
 }
