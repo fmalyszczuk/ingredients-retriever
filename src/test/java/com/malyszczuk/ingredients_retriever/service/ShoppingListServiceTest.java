@@ -28,7 +28,7 @@ class ShoppingListServiceTest {
 
     @BeforeEach
     void setUp() {
-        shoppingListService = new ShoppingListService(shoppingListItemRepository);
+        shoppingListService = new ShoppingListService(shoppingListItemRepository, new UnitConverter());
     }
 
     @Test
@@ -117,6 +117,37 @@ class ShoppingListServiceTest {
         when(shoppingListItemRepository.findByNameIgnoreCase("eggs")).thenReturn(Optional.empty());
 
         assertThrows(NoSuchElementException.class, () -> shoppingListService.updateItem("eggs", true, null, null));
+    }
+
+    @Test
+    void convertItemUnit_recalculatesQuantityAndUpdatesUnit() {
+        ShoppingListItem existing = ShoppingListItem.builder()
+                .name("flour")
+                .quantity(BigDecimal.valueOf(2))
+                .unit("lb")
+                .build();
+        when(shoppingListItemRepository.findByNameIgnoreCase("flour")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShoppingListItem result = shoppingListService.convertItemUnit("flour", "kg");
+
+        assertEquals("kg", result.getUnit());
+        assertEquals(0, BigDecimal.valueOf(0.907).compareTo(result.getQuantity()));
+    }
+
+    @Test
+    void convertItemUnit_throws_whenItemDoesNotExist() {
+        when(shoppingListItemRepository.findByNameIgnoreCase("flour")).thenReturn(Optional.empty());
+
+        assertThrows(NoSuchElementException.class, () -> shoppingListService.convertItemUnit("flour", "kg"));
+    }
+
+    @Test
+    void convertItemUnit_throws_whenItemHasNoExistingQuantityOrUnit() {
+        ShoppingListItem existing = ShoppingListItem.builder().name("salt").quantity(null).unit(null).build();
+        when(shoppingListItemRepository.findByNameIgnoreCase("salt")).thenReturn(Optional.of(existing));
+
+        assertThrows(IllegalArgumentException.class, () -> shoppingListService.convertItemUnit("salt", "kg"));
     }
 
     @Test

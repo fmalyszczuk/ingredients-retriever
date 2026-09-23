@@ -17,6 +17,7 @@ import java.util.Optional;
 public class ShoppingListService {
 
     private final ShoppingListItemRepository shoppingListItemRepository;
+    private final UnitConverter unitConverter;
 
     @Transactional(readOnly = true)
     public List<ShoppingListItem> listItems() {
@@ -71,6 +72,25 @@ public class ShoppingListService {
         if (unit != null) {
             item.setUnit(normalize(unit));
         }
+
+        return shoppingListItemRepository.save(item);
+    }
+
+    @Transactional
+    public ShoppingListItem convertItemUnit(String name, String targetUnit) {
+        ShoppingListItem item = shoppingListItemRepository.findByNameIgnoreCase(normalize(name))
+                .orElseThrow(() -> new NoSuchElementException("No shopping list item named '" + name + "'"));
+
+        if (item.getQuantity() == null || item.getUnit() == null) {
+            throw new IllegalArgumentException(
+                    "Cannot convert unit for '" + name + "' without an existing quantity and unit");
+        }
+
+        String normalizedTargetUnit = normalize(targetUnit);
+        BigDecimal convertedQuantity = unitConverter.convert(item.getQuantity(), item.getUnit(), normalizedTargetUnit);
+
+        item.setQuantity(convertedQuantity);
+        item.setUnit(normalizedTargetUnit);
 
         return shoppingListItemRepository.save(item);
     }
