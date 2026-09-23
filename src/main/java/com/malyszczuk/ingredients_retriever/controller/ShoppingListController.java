@@ -53,6 +53,12 @@ public class ShoppingListController {
         shoppingListService.removeItem(name);
     }
 
+    @DeleteMapping
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void clearItems() {
+        shoppingListService.clearItems();
+    }
+
     private ShoppingListItemResponse toResponse(ShoppingListItem item) {
         return new ShoppingListItemResponse(
                 item.getId(),

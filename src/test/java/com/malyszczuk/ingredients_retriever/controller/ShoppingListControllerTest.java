@@ -123,4 +123,12 @@ class ShoppingListControllerTest {
 
         verify(shoppingListService).removeItem("eggs");
     }
+
+    @Test
+    void clearItems_returnsNoContent() throws Exception {
+        mockMvc.perform(delete("/shopping-list"))
+                .andExpect(status().isNoContent());
+
+        verify(shoppingListService).clearItems();
+    }
 }

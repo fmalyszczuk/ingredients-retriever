@@ -111,6 +111,11 @@ public class ShoppingListService {
                 .ifPresent(shoppingListItemRepository::delete);
     }
 
+    @Transactional
+    public void clearItems() {
+        shoppingListItemRepository.deleteAll();
+    }
+
     private BigDecimal sumQuantities(BigDecimal current, BigDecimal addition) {
         if (current == null || addition == null) {
             return null;

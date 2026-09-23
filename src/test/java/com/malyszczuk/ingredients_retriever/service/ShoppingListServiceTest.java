@@ -260,4 +260,11 @@ class ShoppingListServiceTest {
 
         verify(shoppingListItemRepository, never()).delete(any());
     }
+
+    @Test
+    void clearItems_deletesEveryEntry() {
+        shoppingListService.clearItems();
+
+        verify(shoppingListItemRepository).deleteAll();
+    }
 }
