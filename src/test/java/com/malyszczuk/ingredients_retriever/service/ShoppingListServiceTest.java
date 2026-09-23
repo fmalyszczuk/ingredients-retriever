@@ -145,6 +145,38 @@ class ShoppingListServiceTest {
     }
 
     @Test
+    void updateItem_recalculatesQuantity_forVolumeUnits() {
+        ShoppingListItem existing = ShoppingListItem.builder()
+                .name("milk")
+                .quantity(BigDecimal.valueOf(2))
+                .unit("cup")
+                .build();
+        when(shoppingListItemRepository.findByNameIgnoreCase("milk")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShoppingListItem result = shoppingListService.updateItem("milk", null, null, "ml");
+
+        assertEquals("ml", result.getUnit());
+        assertEquals(0, BigDecimal.valueOf(473.176).compareTo(result.getQuantity()));
+    }
+
+    @Test
+    void updateItem_justRelabelsUnit_whenUnitsAreDifferentTypes() {
+        ShoppingListItem existing = ShoppingListItem.builder()
+                .name("flour")
+                .quantity(BigDecimal.valueOf(2))
+                .unit("lb")
+                .build();
+        when(shoppingListItemRepository.findByNameIgnoreCase("flour")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShoppingListItem result = shoppingListService.updateItem("flour", null, null, "ml");
+
+        assertEquals("ml", result.getUnit());
+        assertEquals(0, BigDecimal.valueOf(2).compareTo(result.getQuantity()));
+    }
+
+    @Test
     void updateItem_setsUnitWithoutConversion_whenNoPriorUnit() {
         ShoppingListItem existing = ShoppingListItem.builder()
                 .name("salt")
@@ -188,6 +220,18 @@ class ShoppingListServiceTest {
         when(shoppingListItemRepository.findByNameIgnoreCase("flour")).thenReturn(Optional.empty());
 
         assertThrows(NoSuchElementException.class, () -> shoppingListService.convertItemUnit("flour", "kg"));
+    }
+
+    @Test
+    void convertItemUnit_throws_whenUnitsAreDifferentTypes() {
+        ShoppingListItem existing = ShoppingListItem.builder()
+                .name("flour")
+                .quantity(BigDecimal.valueOf(2))
+                .unit("lb")
+                .build();
+        when(shoppingListItemRepository.findByNameIgnoreCase("flour")).thenReturn(Optional.of(existing));
+
+        assertThrows(IllegalArgumentException.class, () -> shoppingListService.convertItemUnit("flour", "ml"));
     }
 
     @Test

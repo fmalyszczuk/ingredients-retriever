@@ -46,18 +46,52 @@ class UnitConverterTest {
     @Test
     void convert_throws_whenUnitIsUnsupported() {
         assertThrows(IllegalArgumentException.class,
+                () -> unitConverter.convert(BigDecimal.ONE, "lb", "pcs"));
+    }
+
+    @Test
+    void convert_throws_whenUnitsAreDifferentTypes() {
+        assertThrows(IllegalArgumentException.class,
                 () -> unitConverter.convert(BigDecimal.ONE, "lb", "cups"));
     }
 
     @Test
-    void supports_recognizesKnownMassUnitsCaseInsensitively() {
+    void convert_cupsToMl() {
+        BigDecimal result = unitConverter.convert(BigDecimal.valueOf(2), "cups", "ml");
+
+        assertEquals(0, BigDecimal.valueOf(473.176).compareTo(result));
+    }
+
+    @Test
+    void convert_tbspToTsp() {
+        BigDecimal result = unitConverter.convert(BigDecimal.ONE, "tbsp", "tsp");
+
+        assertEquals(0, BigDecimal.valueOf(3).compareTo(result));
+    }
+
+    @Test
+    void supports_recognizesKnownWeightAndVolumeUnitsCaseInsensitively() {
         assertTrue(unitConverter.supports("LB"));
         assertTrue(unitConverter.supports(" kg "));
+        assertTrue(unitConverter.supports("Tbsp"));
     }
 
     @Test
     void supports_rejectsUnknownOrNullUnits() {
         assertFalse(unitConverter.supports("pcs"));
         assertFalse(unitConverter.supports(null));
+    }
+
+    @Test
+    void canConvert_isTrue_forSameTypeUnits() {
+        assertTrue(unitConverter.canConvert("lb", "kg"));
+        assertTrue(unitConverter.canConvert("cup", "ml"));
+    }
+
+    @Test
+    void canConvert_isFalse_forDifferentTypesOrUnsupportedUnits() {
+        assertFalse(unitConverter.canConvert("lb", "ml"));
+        assertFalse(unitConverter.canConvert("pcs", "box"));
+        assertFalse(unitConverter.canConvert("lb", null));
     }
 }

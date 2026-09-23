@@ -4,6 +4,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.HashMap;
 import java.util.Map;
 
 @Component
@@ -11,27 +12,52 @@ public class UnitConverter {
 
     private static final int SCALE = 3;
 
-    private static final Map<String, BigDecimal> GRAMS_PER_UNIT = Map.ofEntries(
-            Map.entry("mg", BigDecimal.valueOf(0.001)),
-            Map.entry("milligram", BigDecimal.valueOf(0.001)),
-            Map.entry("milligrams", BigDecimal.valueOf(0.001)),
-            Map.entry("g", BigDecimal.ONE),
-            Map.entry("gram", BigDecimal.ONE),
-            Map.entry("grams", BigDecimal.ONE),
-            Map.entry("kg", BigDecimal.valueOf(1000)),
-            Map.entry("kilogram", BigDecimal.valueOf(1000)),
-            Map.entry("kilograms", BigDecimal.valueOf(1000)),
-            Map.entry("oz", BigDecimal.valueOf(28.349523125)),
-            Map.entry("ounce", BigDecimal.valueOf(28.349523125)),
-            Map.entry("ounces", BigDecimal.valueOf(28.349523125)),
-            Map.entry("lb", BigDecimal.valueOf(453.59237)),
-            Map.entry("lbs", BigDecimal.valueOf(453.59237)),
-            Map.entry("pound", BigDecimal.valueOf(453.59237)),
-            Map.entry("pounds", BigDecimal.valueOf(453.59237))
-    );
+    public enum UnitType { WEIGHT, VOLUME }
+
+    private record UnitDefinition(UnitType type, BigDecimal factorToBaseUnit) {
+    }
+
+    // Base unit is grams for WEIGHT, millilitres for VOLUME.
+    private static final Map<String, UnitDefinition> UNITS = buildUnits();
+
+    private static Map<String, UnitDefinition> buildUnits() {
+        Map<String, UnitDefinition> units = new HashMap<>();
+
+        register(units, UnitType.WEIGHT, BigDecimal.valueOf(0.001), "mg", "milligram", "milligrams");
+        register(units, UnitType.WEIGHT, BigDecimal.ONE, "g", "gram", "grams");
+        register(units, UnitType.WEIGHT, BigDecimal.valueOf(1000), "kg", "kilogram", "kilograms");
+        register(units, UnitType.WEIGHT, BigDecimal.valueOf(453.59237), "lb", "lbs", "pound", "pounds");
+
+        register(units, UnitType.VOLUME, BigDecimal.ONE, "ml", "milliliter", "milliliters", "millilitre", "millilitres");
+        register(units, UnitType.VOLUME, BigDecimal.valueOf(1000), "l", "litre", "litres", "liter", "liters");
+        register(units, UnitType.VOLUME, BigDecimal.valueOf(473.176473), "pint", "pints");
+        register(units, UnitType.VOLUME, BigDecimal.valueOf(29.5735295625), "oz", "fl oz", "fluid ounce", "fluid ounces");
+        register(units, UnitType.VOLUME, BigDecimal.valueOf(4.92892159375), "tsp", "teaspoon", "teaspoons");
+        register(units, UnitType.VOLUME, BigDecimal.valueOf(14.78676478125), "tbsp", "tablespoon", "tablespoons");
+        register(units, UnitType.VOLUME, BigDecimal.valueOf(236.5882365), "cup", "cups");
+
+        return Map.copyOf(units);
+    }
+
+    private static void register(Map<String, UnitDefinition> units, UnitType type, BigDecimal factorToBaseUnit, String... aliases) {
+        UnitDefinition definition = new UnitDefinition(type, factorToBaseUnit);
+        for (String alias : aliases) {
+            units.put(alias, definition);
+        }
+    }
 
     public boolean supports(String unit) {
-        return unit != null && GRAMS_PER_UNIT.containsKey(unit.trim().toLowerCase());
+        return lookup(unit) != null;
+    }
+
+    /**
+     * True when both units are recognized and belong to the same unit type (e.g. both WEIGHT, or both VOLUME).
+     * Custom/count units (pcs, box, ...) and cross-type pairs (e.g. lb to ml) return false.
+     */
+    public boolean canConvert(String fromUnit, String toUnit) {
+        UnitDefinition from = lookup(fromUnit);
+        UnitDefinition to = lookup(toUnit);
+        return from != null && to != null && from.type() == to.type();
     }
 
     public BigDecimal convert(BigDecimal quantity, String fromUnit, String toUnit) {
@@ -39,20 +65,32 @@ public class UnitConverter {
             throw new IllegalArgumentException("Quantity to convert must not be null");
         }
 
-        BigDecimal grams = quantity.multiply(gramsPerUnit(fromUnit));
-        return grams.divide(gramsPerUnit(toUnit), SCALE, RoundingMode.HALF_UP);
+        UnitDefinition from = requireUnit(fromUnit);
+        UnitDefinition to = requireUnit(toUnit);
+        if (from.type() != to.type()) {
+            throw new IllegalArgumentException(
+                    "Cannot convert '" + fromUnit + "' (" + from.type() + ") to '" + toUnit + "' (" + to.type()
+                            + "); units must be the same type");
+        }
+
+        BigDecimal baseAmount = quantity.multiply(from.factorToBaseUnit());
+        return baseAmount.divide(to.factorToBaseUnit(), SCALE, RoundingMode.HALF_UP);
     }
 
-    private BigDecimal gramsPerUnit(String unit) {
+    private UnitDefinition requireUnit(String unit) {
         if (unit == null) {
             throw new IllegalArgumentException("Unit must not be null");
         }
-
-        BigDecimal factor = GRAMS_PER_UNIT.get(unit.trim().toLowerCase());
-        if (factor == null) {
+        UnitDefinition definition = lookup(unit);
+        if (definition == null) {
             throw new IllegalArgumentException(
-                    "Unsupported unit for conversion: '" + unit + "'. Supported units: mg, g, kg, oz, lb");
+                    "Unsupported unit for conversion: '" + unit + "'. Supported units: "
+                            + "weight (mg, g, kg, lb), volume (ml, l, pint, oz, tsp, tbsp, cup)");
         }
-        return factor;
+        return definition;
+    }
+
+    private UnitDefinition lookup(String unit) {
+        return unit == null ? null : UNITS.get(unit.trim().toLowerCase());
     }
 }

@@ -22,8 +22,10 @@ public class ConvertItemUnitTool implements AgentTool {
 
     @Override
     public String description() {
-        return "Recalculates a shopping list item's quantity into a different mass unit (mg, g, kg, oz, lb) "
-                + "and updates the item, e.g. converting lbs to kg or g.";
+        return "Recalculates a shopping list item's quantity into a different unit of the same type and updates "
+                + "the item, e.g. converting lbs to kg. Weight units (mg, g, kg, lb) only convert to other weight "
+                + "units, and volume units (ml, l, pint, oz, tsp, tbsp, cup) only convert to other volume units; "
+                + "count units like 'pcs' or 'box' cannot be converted at all.";
     }
 
     @Override

@@ -75,8 +75,9 @@ public class ShoppingListService {
                 item.setUnit(normalizedUnit);
             }
         } else if (normalizedUnit != null && !normalizedUnit.equalsIgnoreCase(item.getUnit())) {
-            // Only the unit changed: recalculate the quantity instead of relabelling it 1:1.
-            if (item.getQuantity() != null && unitConverter.supports(item.getUnit()) && unitConverter.supports(normalizedUnit)) {
+            // Only the unit changed: recalculate the quantity instead of relabelling it 1:1,
+            // but only within the same unit type (weight-to-weight, volume-to-volume).
+            if (item.getQuantity() != null && unitConverter.canConvert(item.getUnit(), normalizedUnit)) {
                 item.setQuantity(unitConverter.convert(item.getQuantity(), item.getUnit(), normalizedUnit));
             }
             item.setUnit(normalizedUnit);
