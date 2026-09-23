@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 @Service
@@ -51,6 +52,24 @@ public class ShoppingListService {
                     .quantity(quantity)
                     .unit(normalize(unit))
                     .build();
+        }
+
+        return shoppingListItemRepository.save(item);
+    }
+
+    @Transactional
+    public ShoppingListItem updateItem(String name, Boolean purchased, BigDecimal quantity, String unit) {
+        ShoppingListItem item = shoppingListItemRepository.findByNameIgnoreCase(normalize(name))
+                .orElseThrow(() -> new NoSuchElementException("No shopping list item named '" + name + "'"));
+
+        if (purchased != null) {
+            item.setPurchased(purchased);
+        }
+        if (quantity != null) {
+            item.setQuantity(quantity);
+        }
+        if (unit != null) {
+            item.setUnit(normalize(unit));
         }
 
         return shoppingListItemRepository.save(item);

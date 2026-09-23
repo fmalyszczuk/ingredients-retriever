@@ -9,11 +9,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -77,6 +76,47 @@ class ShoppingListServiceTest {
     void addItem_rejectsBlankName() {
         assertThrows(IllegalArgumentException.class,
                 () -> shoppingListService.addItem("  ", BigDecimal.ONE, "pcs"));
+    }
+
+    @Test
+    void updateItem_marksPurchased_whenOnlyPurchasedGiven() {
+        ShoppingListItem existing = ShoppingListItem.builder()
+                .name("eggs")
+                .quantity(BigDecimal.valueOf(2))
+                .unit("pcs")
+                .purchased(false)
+                .build();
+        when(shoppingListItemRepository.findByNameIgnoreCase("eggs")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShoppingListItem result = shoppingListService.updateItem("eggs", true, null, null);
+
+        assertTrue(result.isPurchased());
+        assertEquals(0, BigDecimal.valueOf(2).compareTo(result.getQuantity()));
+        assertEquals("pcs", result.getUnit());
+    }
+
+    @Test
+    void updateItem_updatesQuantityAndUnit_whenGiven() {
+        ShoppingListItem existing = ShoppingListItem.builder()
+                .name("flour")
+                .quantity(BigDecimal.valueOf(200))
+                .unit("g")
+                .build();
+        when(shoppingListItemRepository.findByNameIgnoreCase("flour")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShoppingListItem result = shoppingListService.updateItem("flour", null, BigDecimal.valueOf(500), "kg");
+
+        assertEquals(0, BigDecimal.valueOf(500).compareTo(result.getQuantity()));
+        assertEquals("kg", result.getUnit());
+    }
+
+    @Test
+    void updateItem_throws_whenItemDoesNotExist() {
+        when(shoppingListItemRepository.findByNameIgnoreCase("eggs")).thenReturn(Optional.empty());
+
+        assertThrows(NoSuchElementException.class, () -> shoppingListService.updateItem("eggs", true, null, null));
     }
 
     @Test
