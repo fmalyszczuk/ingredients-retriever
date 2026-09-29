@@ -12,8 +12,9 @@ Frontend repo: https://github.com/fmalyszczuk/pantrypal-frontend
 
 ## Features
 
-- Add recipes by URL (scrapes the page's `schema.org/Recipe` data) or type
-  ingredients in by hand.
+- Add recipes by URL (scrapes the page's `schema.org/Recipe` data), by dish
+  name ("spaghetti carbonara" — the local LLM suggests a typical ingredient
+  list), or type ingredients in by hand.
 - A merged shopping list that sums quantities for repeated ingredients.
 - Mark items purchased, edit quantity/unit, or clear the whole list.
 - Automatic unit conversion within the same unit family (weight: mg/g/kg/lb,
@@ -66,6 +67,7 @@ Run the tests with:
 | `GET` | `/recipes` | List saved recipes |
 | `POST` | `/recipes` | Add a recipe by typing in its ingredients |
 | `POST` | `/recipes/from-url` | Add a recipe by scraping a recipe page |
+| `POST` | `/recipes/from-text` | Add a recipe from a dish name (LLM-suggested ingredients) |
 | `POST` | `/chat` | Talk to the shopping list in plain English |
 
 ## Project layout
@@ -77,5 +79,5 @@ repository/     Spring Data JPA repositories
 domain/         JPA entities
 dto/            Request/response records
 agent/          Ollama tool-calling agent for /chat
-extraction/     Recipe parsing (URL scraping, ingredient line parsing)
+extraction/     Recipe parsing (URL scraping, dish-name lookup via Ollama, ingredient line parsing)
 ```

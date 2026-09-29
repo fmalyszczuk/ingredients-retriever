@@ -19,7 +19,7 @@ ingredients across recipes.
 
 ## Planned endpoints
 - POST /recipes/from-url
-- POST /recipes/from-text (name-based search)
+- POST /recipes/from-text { text } (dish name -> Ollama-generated ingredients; implemented)
 - POST /recipes/from-file (doc/pdf/screenshot)
 - GET  /shopping-list
 
