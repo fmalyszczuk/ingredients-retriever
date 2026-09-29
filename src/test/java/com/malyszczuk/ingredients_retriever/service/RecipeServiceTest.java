@@ -6,6 +6,8 @@ import com.malyszczuk.ingredients_retriever.domain.RecipeSource;
 import com.malyszczuk.ingredients_retriever.dto.IngredientRequest;
 import com.malyszczuk.ingredients_retriever.extraction.IngredientLineParser;
 import com.malyszczuk.ingredients_retriever.extraction.ParsedIngredientLine;
+import com.malyszczuk.ingredients_retriever.extraction.text.ExtractedRecipe;
+import com.malyszczuk.ingredients_retriever.extraction.text.RecipeTextExtractor;
 import com.malyszczuk.ingredients_retriever.extraction.url.RawRecipe;
 import com.malyszczuk.ingredients_retriever.extraction.url.RecipeUrlScraper;
 import com.malyszczuk.ingredients_retriever.repository.RecipeRepository;
@@ -40,11 +42,30 @@ class RecipeServiceTest {
     @Mock
     private IngredientLineParser ingredientLineParser;
 
+    @Mock
+    private RecipeTextExtractor recipeTextExtractor;
+
     private RecipeService recipeService;
 
     @BeforeEach
     void setUp() {
-        recipeService = new RecipeService(recipeRepository, shoppingListService, recipeUrlScraper, ingredientLineParser);
+        recipeService = new RecipeService(recipeRepository, shoppingListService, recipeUrlScraper, ingredientLineParser,
+                recipeTextExtractor);
+    }
+
+    @Test
+    void addRecipeFromText_persistsExtractedRecipeAsTextSourced_andMergesIntoShoppingList() {
+        when(recipeTextExtractor.extract("pancakes")).thenReturn(new ExtractedRecipe("Pancakes",
+                List.of(new IngredientRequest("flour", BigDecimal.valueOf(200), "g"))));
+        when(recipeRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Recipe result = recipeService.addRecipeFromText("  pancakes ");
+
+        assertEquals("Pancakes", result.getTitle());
+        assertEquals(RecipeSource.TEXT, result.getSourceType());
+        assertEquals("pancakes", result.getSourceReference());
+        assertEquals("flour", result.getIngredients().getFirst().getName());
+        verify(shoppingListService).addIngredients(any());
     }
 
     @Test

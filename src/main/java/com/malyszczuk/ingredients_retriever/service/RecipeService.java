@@ -6,6 +6,8 @@ import com.malyszczuk.ingredients_retriever.domain.RecipeSource;
 import com.malyszczuk.ingredients_retriever.dto.IngredientRequest;
 import com.malyszczuk.ingredients_retriever.extraction.IngredientLineParser;
 import com.malyszczuk.ingredients_retriever.extraction.ParsedIngredientLine;
+import com.malyszczuk.ingredients_retriever.extraction.text.ExtractedRecipe;
+import com.malyszczuk.ingredients_retriever.extraction.text.RecipeTextExtractor;
 import com.malyszczuk.ingredients_retriever.extraction.url.RawRecipe;
 import com.malyszczuk.ingredients_retriever.extraction.url.RecipeUrlScraper;
 import com.malyszczuk.ingredients_retriever.repository.RecipeRepository;
@@ -23,6 +25,7 @@ public class RecipeService {
     private final ShoppingListService shoppingListService;
     private final RecipeUrlScraper recipeUrlScraper;
     private final IngredientLineParser ingredientLineParser;
+    private final RecipeTextExtractor recipeTextExtractor;
 
     @Transactional(readOnly = true)
     public List<Recipe> listRecipes() {
@@ -61,6 +64,14 @@ public class RecipeService {
                 .toList();
 
         return addRecipe(rawRecipe.title(), RecipeSource.URL, url, ingredientRequests);
+    }
+
+    @Transactional
+    public Recipe addRecipeFromText(String text) {
+        String trimmedText = text.trim();
+        ExtractedRecipe extracted = recipeTextExtractor.extract(trimmedText);
+
+        return addRecipe(extracted.title(), RecipeSource.TEXT, trimmedText, extracted.ingredients());
     }
 
     private IngredientRequest toIngredientRequest(ParsedIngredientLine parsed) {

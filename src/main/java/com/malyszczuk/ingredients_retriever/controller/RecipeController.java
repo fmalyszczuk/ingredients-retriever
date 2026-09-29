@@ -3,6 +3,7 @@ package com.malyszczuk.ingredients_retriever.controller;
 import com.malyszczuk.ingredients_retriever.domain.Ingredient;
 import com.malyszczuk.ingredients_retriever.domain.Recipe;
 import com.malyszczuk.ingredients_retriever.domain.RecipeSource;
+import com.malyszczuk.ingredients_retriever.dto.CreateRecipeFromTextRequest;
 import com.malyszczuk.ingredients_retriever.dto.CreateRecipeFromUrlRequest;
 import com.malyszczuk.ingredients_retriever.dto.CreateRecipeRequest;
 import com.malyszczuk.ingredients_retriever.dto.IngredientResponse;
@@ -49,6 +50,13 @@ public class RecipeController {
     @ResponseStatus(HttpStatus.CREATED)
     public RecipeResponse addRecipeFromUrl(@Valid @RequestBody CreateRecipeFromUrlRequest request) {
         Recipe recipe = recipeService.addRecipeFromUrl(request.url());
+        return toResponse(recipe);
+    }
+
+    @PostMapping("/from-text")
+    @ResponseStatus(HttpStatus.CREATED)
+    public RecipeResponse addRecipeFromText(@Valid @RequestBody CreateRecipeFromTextRequest request) {
+        Recipe recipe = recipeService.addRecipeFromText(request.text());
         return toResponse(recipe);
     }
 
