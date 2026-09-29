@@ -5,6 +5,7 @@ import com.malyszczuk.ingredients_retriever.domain.Recipe;
 import com.malyszczuk.ingredients_retriever.domain.RecipeSource;
 import com.malyszczuk.ingredients_retriever.dto.CreateRecipeRequest;
 import com.malyszczuk.ingredients_retriever.dto.IngredientRequest;
+import com.malyszczuk.ingredients_retriever.extraction.RecipeExtractionException;
 import com.malyszczuk.ingredients_retriever.service.RecipeService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +13,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.client.ResourceAccessException;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
@@ -76,6 +78,48 @@ class RecipeControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void addRecipeFromText_returnsCreatedRecipe() throws Exception {
+        Recipe recipe = Recipe.builder().id(1L).title("Pancakes").sourceType(RecipeSource.TEXT).build();
+        recipe.setIngredients(List.of(Ingredient.builder().id(1L).name("flour").recipe(recipe).build()));
+        when(recipeService.addRecipeFromText("pancakes")).thenReturn(recipe);
+
+        mockMvc.perform(post("/recipes/from-text")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\": \"pancakes\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.sourceType").value("TEXT"))
+                .andExpect(jsonPath("$.ingredients[0].name").value("flour"));
+    }
+
+    @Test
+    void addRecipeFromText_rejectsBlankText() throws Exception {
+        mockMvc.perform(post("/recipes/from-text")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\": \"  \"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void addRecipeFromText_returnsUnprocessable_whenExtractionFails() throws Exception {
+        when(recipeService.addRecipeFromText("asdf")).thenThrow(new RecipeExtractionException("no ingredients"));
+
+        mockMvc.perform(post("/recipes/from-text")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\": \"asdf\"}"))
+                .andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
+    void addRecipeFromText_returnsServiceUnavailable_whenOllamaIsDown() throws Exception {
+        when(recipeService.addRecipeFromText("pancakes")).thenThrow(new ResourceAccessException("connection refused"));
+
+        mockMvc.perform(post("/recipes/from-text")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\": \"pancakes\"}"))
+                .andExpect(status().isServiceUnavailable());
     }
 
     @Test
