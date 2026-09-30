@@ -1,6 +1,7 @@
 package com.malyszczuk.ingredients_retriever.exception;
 
 import com.malyszczuk.ingredients_retriever.extraction.RecipeExtractionException;
+import com.malyszczuk.ingredients_retriever.extraction.file.UnsupportedFileTypeException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -26,6 +27,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RecipeExtractionException.class)
     public ResponseEntity<String> handleRecipeExtraction(RecipeExtractionException exception) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(exception.getMessage());
+    }
+
+    @ExceptionHandler(UnsupportedFileTypeException.class)
+    public ResponseEntity<String> handleUnsupportedFileType(UnsupportedFileTypeException exception) {
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(exception.getMessage());
     }
 
     @ExceptionHandler(ResourceAccessException.class)

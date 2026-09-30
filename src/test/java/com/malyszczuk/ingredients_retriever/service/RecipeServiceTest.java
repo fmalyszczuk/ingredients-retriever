@@ -6,6 +6,7 @@ import com.malyszczuk.ingredients_retriever.domain.RecipeSource;
 import com.malyszczuk.ingredients_retriever.dto.IngredientRequest;
 import com.malyszczuk.ingredients_retriever.extraction.IngredientLineParser;
 import com.malyszczuk.ingredients_retriever.extraction.ParsedIngredientLine;
+import com.malyszczuk.ingredients_retriever.extraction.file.RecipeFileExtractor;
 import com.malyszczuk.ingredients_retriever.extraction.text.ExtractedRecipe;
 import com.malyszczuk.ingredients_retriever.extraction.text.RecipeTextExtractor;
 import com.malyszczuk.ingredients_retriever.extraction.url.RawRecipe;
@@ -45,12 +46,31 @@ class RecipeServiceTest {
     @Mock
     private RecipeTextExtractor recipeTextExtractor;
 
+    @Mock
+    private RecipeFileExtractor recipeFileExtractor;
+
     private RecipeService recipeService;
 
     @BeforeEach
     void setUp() {
         recipeService = new RecipeService(recipeRepository, shoppingListService, recipeUrlScraper, ingredientLineParser,
-                recipeTextExtractor);
+                recipeTextExtractor, recipeFileExtractor);
+    }
+
+    @Test
+    void addRecipeFromFile_persistsExtractedRecipeAsFileSourced_andMergesIntoShoppingList() {
+        byte[] content = {1, 2, 3};
+        when(recipeFileExtractor.extract("pancakes.pdf", content)).thenReturn(new ExtractedRecipe("Pancakes",
+                List.of(new IngredientRequest("flour", BigDecimal.valueOf(200), "g"))));
+        when(recipeRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Recipe result = recipeService.addRecipeFromFile("pancakes.pdf", content);
+
+        assertEquals("Pancakes", result.getTitle());
+        assertEquals(RecipeSource.FILE, result.getSourceType());
+        assertEquals("pancakes.pdf", result.getSourceReference());
+        assertEquals("flour", result.getIngredients().getFirst().getName());
+        verify(shoppingListService).addIngredients(any());
     }
 
     @Test

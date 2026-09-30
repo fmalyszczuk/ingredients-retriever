@@ -12,13 +12,17 @@ import com.malyszczuk.ingredients_retriever.service.RecipeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -58,6 +62,25 @@ public class RecipeController {
     public RecipeResponse addRecipeFromText(@Valid @RequestBody CreateRecipeFromTextRequest request) {
         Recipe recipe = recipeService.addRecipeFromText(request.text());
         return toResponse(recipe);
+    }
+
+    @PostMapping(value = "/from-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public RecipeResponse addRecipeFromFile(@RequestParam("file") MultipartFile file) throws IOException {
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("Uploaded file is empty");
+        }
+        Recipe recipe = recipeService.addRecipeFromFile(safeFilename(file.getOriginalFilename()), file.getBytes());
+        return toResponse(recipe);
+    }
+
+    // Browsers may send a full client-side path; keep only the file name, and bound its length for storage.
+    private String safeFilename(String originalFilename) {
+        if (originalFilename == null || originalFilename.isBlank()) {
+            return "upload";
+        }
+        String name = originalFilename.substring(Math.max(originalFilename.lastIndexOf('/'), originalFilename.lastIndexOf('\\')) + 1);
+        return name.length() > 200 ? name.substring(name.length() - 200) : name;
     }
 
     private RecipeResponse toResponse(Recipe recipe) {
