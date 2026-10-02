@@ -3,7 +3,7 @@ package com.malyszczuk.ingredients_retriever.agent;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "pantrypal.ollama")
-public record OllamaProperties(String baseUrl, String model, String visionModel) {
+public record OllamaProperties(String baseUrl, String model, String visionModel, Double chatTemperature) {
 
     public OllamaProperties {
         if (baseUrl == null || baseUrl.isBlank()) {
@@ -14,6 +14,10 @@ public record OllamaProperties(String baseUrl, String model, String visionModel)
         }
         if (visionModel == null || visionModel.isBlank()) {
             visionModel = "gemma3:4b";
+        }
+        // At Ollama's default temperature the small model sometimes wrote a tool call as text instead of making it.
+        if (chatTemperature == null) {
+            chatTemperature = 0.0;
         }
     }
 }
