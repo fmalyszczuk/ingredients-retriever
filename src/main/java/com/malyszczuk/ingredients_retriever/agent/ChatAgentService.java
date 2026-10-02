@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,8 @@ public class ChatAgentService {
             - add_item ADDS an amount to what is already on the list. To set, change or correct the quantity or unit of an item that is already there ("make it 3 kg", "change the eggs to 6"), use update_item, not add_item.
             - "it" and "that" mean the item discussed most recently in this conversation.
             - clear_shopping_list deletes everything. The first time you call it nothing is deleted yet: ask the user whether they are sure. Call it again only after they clearly say yes; if they say no, do not call it.
+            - add_recipe saves a recipe (a dish name or a recipe page URL) and puts its ingredients on the shopping list. For a dish name the ingredients are only AI suggestions: say so.
+            - delete_recipe removes a saved recipe by its title and works like clear_shopping_list: the first call deletes nothing, so ask the user whether they are sure, and call it again only after they clearly say yes. To remove one shopping list item use remove_item, never delete_recipe.
             - If you are not sure what is on the list, call list_items first.
             After changing the list, reply with one short sentence saying what you changed.""";
 
@@ -106,13 +109,20 @@ public class ChatAgentService {
         if (tool == null) {
             status = ChatAction.ERROR;
             result = Map.of("error", "Unknown tool: " + toolName);
-        } else if (tool.requiresConfirmation() && !askedTools.contains(toolName)) {
+        } else if (tool.requiresConfirmation() && !askedTools.contains(confirmationKey(tool, arguments))) {
             // Enforced here rather than trusted to the model: nothing runs until the user has been asked and
             // has answered in a separate message.
-            toolsAwaitingConfirmation.add(toolName);
+            toolsAwaitingConfirmation.add(confirmationKey(tool, arguments));
             status = ChatAction.CONFIRMATION_REQUIRED;
-            result = Map.of("status", "confirmation_required",
-                    "instruction", "Nothing was changed. Ask the user to confirm, and call this tool again only if they say yes.");
+            Map<String, Object> request = new LinkedHashMap<>();
+            request.put("status", "confirmation_required");
+            String description = tool.confirmationDescription(arguments);
+            if (description != null && !description.isEmpty()) {
+                request.put("action", description);
+            }
+            request.put("instruction", "Nothing was changed. Ask the user to confirm this exact action, and call this tool "
+                    + "again with the same arguments only if they say yes.");
+            result = request;
         } else if (tool.requiresConfirmation() && !userConfirmed) {
             status = ChatAction.NOT_CONFIRMED;
             result = Map.of("status", "not_confirmed",
@@ -134,6 +144,12 @@ public class ChatAgentService {
         boolean worthReporting = !ChatAction.OK.equals(status) || tool.changesShoppingList();
         actions.add(new ChatAction(toolName, arguments, status, worthReporting ? result : null));
         return objectMapper.writeValueAsString(result);
+    }
+
+    // The tool name, plus what it targets, so a confirmation only ever covers the exact thing the user was asked about.
+    private String confirmationKey(AgentTool tool, Map<String, Object> arguments) {
+        String target = tool.confirmationTarget(arguments);
+        return target.isEmpty() ? tool.name() : tool.name() + ":" + target;
     }
 
     private boolean changedShoppingList(List<ChatAction> actions, Map<String, AgentTool> toolsByName) {

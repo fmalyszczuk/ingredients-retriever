@@ -23,6 +23,11 @@ public class ClearShoppingListTool implements AgentTool {
     }
 
     @Override
+    public String confirmationDescription(Map<String, Object> arguments) {
+        return "Remove every item from the shopping list";
+    }
+
+    @Override
     public String name() {
         return "clear_shopping_list";
     }

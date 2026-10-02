@@ -193,6 +193,7 @@ class ChatAgentServiceTest {
         when(tool.parameterSchema()).thenReturn(Map.of("type", "object"));
         lenient().when(tool.changesShoppingList()).thenReturn(changesList);
         lenient().when(tool.requiresConfirmation()).thenReturn(needsConfirmation);
+        lenient().when(tool.confirmationTarget(any())).thenReturn("");
         return tool;
     }
 
@@ -453,5 +454,81 @@ class ChatAgentServiceTest {
         when(ollamaChatClient.chat(any(), any())).thenReturn(says("Hello!"));
 
         assertFalse(chatAgentService.chat("c1", "hi").incomplete());
+    }
+
+    private AgentTool deleteRecipeTool() {
+        AgentTool tool = toolMock("delete_recipe", true, true);
+        lenient().when(tool.confirmationTarget(any()))
+                .thenAnswer(invocation -> String.valueOf(((Map<?, ?>) invocation.getArgument(0)).get("id")));
+        lenient().when(tool.execute(any())).thenReturn(Map.of("deleted", true));
+        return tool;
+    }
+
+    private OllamaChatResponse callsWith(String toolName, Map<String, Object> arguments) {
+        OllamaToolCall call = new OllamaToolCall(new OllamaToolCallFunction(toolName, arguments));
+        return new OllamaChatResponse("llama3.2", "now", new OllamaMessage("assistant", "", List.of(call)), true);
+    }
+
+    @Test
+    void chat_runsAConfirmedTargetedTool_whenTheSameTargetIsConfirmed() {
+        AgentTool delete = deleteRecipeTool();
+        ChatAgentService service = serviceWith(delete);
+        when(ollamaChatClient.chat(any(), any())).thenReturn(
+                callsWith("delete_recipe", Map.of("id", 1)), says("Delete recipe 1?"),
+                callsWith("delete_recipe", Map.of("id", 1)), says("Deleted."));
+
+        service.chat("c1", "delete the pancake recipe");
+        ChatResult confirmed = service.chat("c1", "yes");
+
+        verify(delete, times(1)).execute(any());
+        assertEquals(ChatAction.OK, confirmed.actions().getFirst().status());
+    }
+
+    @Test
+    void chat_doesNotLetAConfirmationForOneRecipeDeleteAnotherOne() {
+        AgentTool delete = deleteRecipeTool();
+        ChatAgentService service = serviceWith(delete);
+        when(ollamaChatClient.chat(any(), any())).thenReturn(
+                callsWith("delete_recipe", Map.of("id", 1)), says("Delete recipe 1?"),
+                callsWith("delete_recipe", Map.of("id", 2)), says("Delete recipe 2?"));
+
+        service.chat("c1", "delete the pancake recipe");
+        ChatResult other = service.chat("c1", "yes");
+
+        verify(delete, never()).execute(any());
+        assertEquals(ChatAction.CONFIRMATION_REQUIRED, other.actions().getFirst().status());
+    }
+
+    @Test
+    void chat_treatsTheSameIdWrittenDifferentlyAsTheSameTarget() {
+        AgentTool delete = deleteRecipeTool();
+        org.mockito.Mockito.doReturn("1").when(delete).confirmationTarget(any());
+        ChatAgentService service = serviceWith(delete);
+        when(ollamaChatClient.chat(any(), any())).thenReturn(
+                callsWith("delete_recipe", Map.of("id", 1)), says("Sure?"),
+                callsWith("delete_recipe", Map.of("id", "1")), says("Deleted."));
+
+        service.chat("c1", "delete it");
+        service.chat("c1", "yes");
+
+        verify(delete, times(1)).execute(any());
+    }
+
+    @Test
+    void chat_tellsTheModelExactlyWhatItIsAskingTheUserToConfirm() {
+        AgentTool delete = deleteRecipeTool();
+        org.mockito.Mockito.doReturn("Delete the saved recipe 'Pancakes' (id 1)").when(delete).confirmationDescription(any());
+        List<List<OllamaMessage>> sentToModel = new java.util.ArrayList<>();
+        when(ollamaChatClient.chat(any(), any())).thenAnswer(invocation -> {
+            sentToModel.add(List.copyOf(invocation.getArgument(0)));
+            return sentToModel.size() == 1 ? callsWith("delete_recipe", Map.of("id", 1)) : says("Delete 'Pancakes'?");
+        });
+
+        serviceWith(delete).chat("c1", "delete the pancakes");
+
+        OllamaMessage toolResult = sentToModel.get(1).getLast();
+        assertEquals("tool", toolResult.role());
+        assertTrue(toolResult.content().contains("Delete the saved recipe 'Pancakes' (id 1)"));
+        assertTrue(toolResult.content().contains("confirmation_required"));
     }
 }
