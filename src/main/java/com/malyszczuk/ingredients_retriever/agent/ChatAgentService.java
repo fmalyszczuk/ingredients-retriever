@@ -22,6 +22,9 @@ public class ChatAgentService {
 
     private static final int MAX_TOOL_CALL_ROUNDS = 5;
 
+    static final String GIVE_UP_REPLY =
+            "Sorry, I couldn't finish that. Please try rephrasing it, and check the shopping list to see what changed.";
+
     // The small local model reliably understands "it" from the history but picked add_item for "make it 3 kg",
     // turning 2 kg into 5 kg, so the add/update distinction is spelled out. The clear confirmation is enforced in
     // code (see executeToolCall); the prompt only makes the model's wording match what happens.
@@ -60,6 +63,9 @@ public class ChatAgentService {
 
         for (int round = 0; round < MAX_TOOL_CALL_ROUNDS; round++) {
             OllamaChatResponse response = ollamaChatClient.chat(messages, toolDefinitions);
+            if (response == null || response.message() == null) {
+                throw new OllamaResponseException("The language model (Ollama) returned an empty response");
+            }
             OllamaMessage assistantMessage = response.message();
             messages.add(assistantMessage);
 
@@ -77,8 +83,10 @@ public class ChatAgentService {
             }
         }
 
-        throw new IllegalStateException(
-                "Ollama did not produce a final answer within " + MAX_TOOL_CALL_ROUNDS + " tool-call rounds");
+        // Tools may already have changed the list, so report that instead of failing the request. The turn is not
+        // remembered, and nothing is left awaiting confirmation.
+        log.warn("No final answer after {} tool-call rounds; giving up", MAX_TOOL_CALL_ROUNDS);
+        return new ChatResult(GIVE_UP_REPLY, actions, changedShoppingList(actions, toolsByName), true);
     }
 
     public void forgetConversation(String conversationId) {

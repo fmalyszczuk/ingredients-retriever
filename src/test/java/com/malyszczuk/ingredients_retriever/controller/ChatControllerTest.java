@@ -2,6 +2,7 @@ package com.malyszczuk.ingredients_retriever.controller;
 
 import com.malyszczuk.ingredients_retriever.agent.ChatAgentService;
 import com.malyszczuk.ingredients_retriever.agent.ChatResult;
+import com.malyszczuk.ingredients_retriever.agent.OllamaResponseException;
 import com.malyszczuk.ingredients_retriever.dto.ChatAction;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +62,7 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.reply").value("Added milk."))
                 .andExpect(jsonPath("$.conversationId").value("abc-123"))
                 .andExpect(jsonPath("$.shoppingListChanged").value(false))
+                .andExpect(jsonPath("$.incomplete").value(false))
                 .andExpect(jsonPath("$.actions").isEmpty());
     }
 
@@ -98,5 +100,62 @@ class ChatControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(chatAgentService).forgetConversation("abc-123");
+    }
+
+    @Test
+    void chat_returnsOkWithIncompleteFlag_andWhatRan_whenTheAssistantGaveUp() throws Exception {
+        when(chatAgentService.chat(any(), any())).thenReturn(new ChatResult("Sorry, I couldn't finish that.",
+                List.of(new ChatAction("add_item", Map.of("name", "eggs"), ChatAction.OK, Map.of("name", "eggs"))), true, true));
+
+        mockMvc.perform(post("/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\": \"add eggs forever\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.incomplete").value(true))
+                .andExpect(jsonPath("$.shoppingListChanged").value(true))
+                .andExpect(jsonPath("$.actions[0].tool").value("add_item"));
+    }
+
+    @Test
+    void chat_returnsGatewayTimeout_whenOllamaTakesTooLong() throws Exception {
+        when(chatAgentService.chat(any(), any())).thenThrow(new ResourceAccessException("I/O error",
+                new java.net.http.HttpTimeoutException("request timed out")));
+
+        mockMvc.perform(post("/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\": \"hi\"}"))
+                .andExpect(status().isGatewayTimeout());
+    }
+
+    @Test
+    void chat_returnsGatewayTimeout_forASocketReadTimeout() throws Exception {
+        when(chatAgentService.chat(any(), any())).thenThrow(new ResourceAccessException("I/O error",
+                new java.net.SocketTimeoutException("Read timed out")));
+
+        mockMvc.perform(post("/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\": \"hi\"}"))
+                .andExpect(status().isGatewayTimeout());
+    }
+
+    @Test
+    void chat_returnsServiceUnavailable_whenConnectingToOllamaTimesOut() throws Exception {
+        when(chatAgentService.chat(any(), any())).thenThrow(new ResourceAccessException("I/O error",
+                new java.net.http.HttpConnectTimeoutException("HTTP connect timed out")));
+
+        mockMvc.perform(post("/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\": \"hi\"}"))
+                .andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
+    void chat_returnsBadGateway_whenOllamaReturnsNothingUsable() throws Exception {
+        when(chatAgentService.chat(any(), any())).thenThrow(new OllamaResponseException("empty response"));
+
+        mockMvc.perform(post("/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\": \"hi\"}"))
+                .andExpect(status().isBadGateway());
     }
 }

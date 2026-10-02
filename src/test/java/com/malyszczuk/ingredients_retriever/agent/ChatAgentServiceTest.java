@@ -76,13 +76,20 @@ class ChatAgentServiceTest {
     }
 
     @Test
-    void chat_throws_whenToolCallLoopNeverTerminates() {
+    void chat_givesUpGracefully_whenToolCallLoopNeverTerminates() {
         OllamaToolCall toolCall = new OllamaToolCall(new OllamaToolCallFunction("add_item", Map.of("name", "eggs")));
         OllamaMessage toolCallMessage = new OllamaMessage("assistant", "", List.of(toolCall));
         when(ollamaChatClient.chat(any(), any())).thenReturn(new OllamaChatResponse("llama3.2", "now", toolCallMessage, true));
+        when(addItemTool.changesShoppingList()).thenReturn(true);
         when(addItemTool.execute(any())).thenReturn(Map.of("name", "eggs"));
 
-        assertThrows(IllegalStateException.class, () -> chatAgentService.chat("c1", "add eggs forever"));
+        ChatResult result = chatAgentService.chat("c1", "add eggs forever");
+
+        assertTrue(result.incomplete());
+        assertEquals(ChatAgentService.GIVE_UP_REPLY, result.reply());
+        // The tools did run, so the response must still say the list changed.
+        assertTrue(result.shoppingListChanged());
+        assertEquals(5, result.actions().size());
     }
 
     @Test
@@ -135,14 +142,15 @@ class ChatAgentServiceTest {
     }
 
     @Test
-    void chat_doesNotRememberATurnThatFailed() {
+    void chat_doesNotRememberATurnTheAssistantGaveUpOn() {
         OllamaToolCall toolCall = new OllamaToolCall(new OllamaToolCallFunction("add_item", Map.of("name", "eggs")));
         when(ollamaChatClient.chat(any(), any()))
                 .thenReturn(new OllamaChatResponse("llama3.2", "now", new OllamaMessage("assistant", "", List.of(toolCall)), true));
         when(addItemTool.execute(any())).thenReturn(Map.of("name", "eggs"));
 
-        assertThrows(IllegalStateException.class, () -> chatAgentService.chat("c1", "add eggs forever"));
+        ChatResult result = chatAgentService.chat("c1", "add eggs forever");
 
+        assertTrue(result.incomplete());
         assertTrue(conversationStore.history("c1").isEmpty());
     }
 
@@ -409,5 +417,41 @@ class ChatAgentServiceTest {
 
         verify(clear, never()).execute(any());
         assertEquals(ChatAction.CONFIRMATION_REQUIRED, third.actions().getFirst().status());
+    }
+
+    @Test
+    void chat_doesNotLeaveAConfirmationPending_whenTheAssistantGivesUp() {
+        AgentTool clear = toolMock("clear_shopping_list", true, true);
+        ChatAgentService service = serviceWith(clear);
+        // Round after round of confirmation requests, never a final answer.
+        when(ollamaChatClient.chat(any(), any())).thenReturn(calls("clear_shopping_list"));
+
+        ChatResult gaveUp = service.chat("c1", "clear my list");
+
+        assertTrue(gaveUp.incomplete());
+        assertTrue(conversationStore.takePendingConfirmations("c1").isEmpty());
+        verify(clear, never()).execute(any());
+    }
+
+    @Test
+    void chat_throwsAClearError_whenOllamaReturnsNoResponse() {
+        when(ollamaChatClient.chat(any(), any())).thenReturn(null);
+
+        assertThrows(OllamaResponseException.class, () -> chatAgentService.chat("c1", "hi"));
+    }
+
+    @Test
+    void chat_throwsAClearError_whenOllamaReturnsNoMessage() {
+        when(ollamaChatClient.chat(any(), any())).thenReturn(new OllamaChatResponse("llama3.2", "now", null, true));
+
+        assertThrows(OllamaResponseException.class, () -> chatAgentService.chat("c1", "hi"));
+        assertTrue(conversationStore.history("c1").isEmpty());
+    }
+
+    @Test
+    void chat_reportsACompleteTurnAsNotIncomplete() {
+        when(ollamaChatClient.chat(any(), any())).thenReturn(says("Hello!"));
+
+        assertFalse(chatAgentService.chat("c1", "hi").incomplete());
     }
 }
