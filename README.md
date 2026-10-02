@@ -16,7 +16,9 @@ Frontend repo: https://github.com/fmalyszczuk/pantrypal-frontend
   name ("spaghetti carbonara" — the local LLM suggests a typical ingredient
   list), from an uploaded file (PDF, DOCX, TXT, or a screenshot, photo or
   scanned PDF read by a local vision model), or type ingredients in by hand.
-- A merged shopping list that sums quantities for repeated ingredients.
+- A merged shopping list that sums quantities for repeated ingredients,
+  converting between compatible units (200 g + 1 kg = 1200 g) and keeping
+  amounts that can't be added (1 pcs onion + 200 g onion) in separate rows.
 - Mark items purchased, edit quantity/unit, or clear the whole list.
 - Automatic unit conversion within the same unit family (weight: mg/g/kg/lb,
   volume: ml/l/pint/oz/tsp/tbsp/cup) — count-based units like `pcs` are left
