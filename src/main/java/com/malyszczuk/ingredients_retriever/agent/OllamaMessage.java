@@ -21,8 +21,9 @@ public record OllamaMessage(
         return new OllamaMessage("user", content, null);
     }
 
-    public static OllamaMessage userWithImage(String content, byte[] image) {
-        return new OllamaMessage("user", content, null, List.of(Base64.getEncoder().encodeToString(image)));
+    public static OllamaMessage userWithImages(String content, List<byte[]> images) {
+        List<String> encoded = images.stream().map(image -> Base64.getEncoder().encodeToString(image)).toList();
+        return new OllamaMessage("user", content, null, encoded);
     }
 
     public static OllamaMessage tool(String content) {

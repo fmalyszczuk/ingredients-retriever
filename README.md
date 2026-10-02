@@ -14,8 +14,8 @@ Frontend repo: https://github.com/fmalyszczuk/pantrypal-frontend
 
 - Add recipes by URL (scrapes the page's `schema.org/Recipe` data), by dish
   name ("spaghetti carbonara" — the local LLM suggests a typical ingredient
-  list), from an uploaded file (PDF, DOCX, TXT, or a screenshot/photo read by
-  a local vision model), or type ingredients in by hand.
+  list), from an uploaded file (PDF, DOCX, TXT, or a screenshot, photo or
+  scanned PDF read by a local vision model), or type ingredients in by hand.
 - A merged shopping list that sums quantities for repeated ingredients.
 - Mark items purchased, edit quantity/unit, or clear the whole list.
 - Automatic unit conversion within the same unit family (weight: mg/g/kg/lb,

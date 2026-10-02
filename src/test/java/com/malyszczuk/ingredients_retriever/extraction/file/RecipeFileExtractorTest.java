@@ -11,11 +11,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -32,13 +35,16 @@ class RecipeFileExtractorTest {
     private DocumentTextReader documentTextReader;
 
     @Mock
+    private PdfPageRenderer pdfPageRenderer;
+
+    @Mock
     private OllamaChatClient ollamaChatClient;
 
     private RecipeFileExtractor extractor;
 
     @BeforeEach
     void setUp() {
-        extractor = new RecipeFileExtractor(documentTextReader, ollamaChatClient, new ObjectMapper());
+        extractor = new RecipeFileExtractor(documentTextReader, pdfPageRenderer, ollamaChatClient, new ObjectMapper());
     }
 
     @Test
@@ -54,18 +60,18 @@ class RecipeFileExtractorTest {
         ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
         verify(ollamaChatClient).chatStructured(prompt.capture(), any());
         assertTrue(prompt.getValue().contains("<document>250 g flour</document>"));
-        verify(ollamaChatClient, never()).chatStructuredWithImage(any(), any(), any());
+        verify(ollamaChatClient, never()).chatStructuredWithImages(any(), any(), any());
     }
 
     @Test
     void extract_sendsImagesToTheVisionModel_withoutReadingText() {
         byte[] image = {9, 8, 7};
-        when(ollamaChatClient.chatStructuredWithImage(any(), eq(image), any())).thenReturn(RECIPE_JSON);
+        when(ollamaChatClient.chatStructuredWithImages(any(), eq(List.of(image)), any())).thenReturn(RECIPE_JSON);
 
         ExtractedRecipe result = extractor.extract("screenshot.png", image);
 
         assertEquals("Pancakes", result.title());
-        verifyNoInteractions(documentTextReader);
+        verifyNoInteractions(documentTextReader, pdfPageRenderer);
         verify(ollamaChatClient, never()).chatStructured(any(), any());
     }
 
@@ -92,11 +98,34 @@ class RecipeFileExtractorTest {
     }
 
     @Test
-    void extract_throws_whenFileHasNoText() {
-        when(documentTextReader.read(any(), any(), any())).thenReturn("  \n ");
+    void extract_rendersScannedPdfPagesForTheVisionModel_whenPdfHasNoTextLayer() {
+        byte[] pdf = {1, 2, 3};
+        List<byte[]> pages = List.of(new byte[]{4}, new byte[]{5});
+        when(documentTextReader.read(FileKind.PDF, "scan.pdf", pdf)).thenReturn("   ");
+        when(pdfPageRenderer.render(pdf, RecipeFileExtractor.MAX_SCANNED_PDF_PAGES)).thenReturn(pages);
+        when(ollamaChatClient.chatStructuredWithImages(any(), eq(pages), any())).thenReturn(RECIPE_JSON);
+
+        ExtractedRecipe result = extractor.extract("scan.pdf", pdf);
+
+        assertEquals("Pancakes", result.title());
+        verify(ollamaChatClient, never()).chatStructured(any(), any());
+    }
+
+    @Test
+    void extract_throws_whenScannedPdfPagesCannotBeRendered() {
+        when(documentTextReader.read(any(), any(), any())).thenReturn("");
+        when(pdfPageRenderer.render(any(), anyInt())).thenThrow(new RecipeExtractionException("Could not render"));
 
         assertThrows(RecipeExtractionException.class, () -> extractor.extract("scan.pdf", new byte[]{1}));
         verifyNoInteractions(ollamaChatClient);
+    }
+
+    @Test
+    void extract_throws_whenNonPdfFileHasNoText() {
+        when(documentTextReader.read(any(), any(), any())).thenReturn("   ");
+
+        assertThrows(RecipeExtractionException.class, () -> extractor.extract("empty.docx", new byte[]{1}));
+        verifyNoInteractions(ollamaChatClient, pdfPageRenderer);
     }
 
     @Test

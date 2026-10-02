@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.List;
+
 /**
  * Extracts a recipe from an uploaded file. PDF, DOCX and text files are read to text and sent to the
  * text model; images are sent directly to the vision model.
@@ -19,13 +21,16 @@ public class RecipeFileExtractor {
     // Ollama's default context window is small (4096 tokens on an 8 GB GPU); longer text would be silently cut off.
     static final int MAX_TEXT_CHARS = 8000;
 
+    // Each page is a separate image for the vision model; more than a few makes the request slow and memory-hungry.
+    static final int MAX_SCANNED_PDF_PAGES = 3;
+
     private static final String INSTRUCTIONS = """
             Extract the recipe as JSON.
             - "is_dish": false if there is no recipe (then leave "ingredients" empty), otherwise true.
             - "title": the recipe title as written.
             - "ingredients": ONLY the ingredients the recipe lists, with their amounts as written. Do not add ingredients that are not listed.
               - "name": lowercase, singular where natural, no preparation notes (write "onion", not "chopped onion").
-              - "quantity": always a positive number (use decimals for fractions). If no amount is given (e.g. "salt to taste"), use a small amount such as 1 tsp.
+              - "quantity": always a positive number. Write fractions as decimals: 1/4 is 0.25, 1/2 is 0.5, 3/4 is 0.75, 1 1/4 is 1.25, 1 1/2 is 1.5. If no amount is given (e.g. "salt to taste"), use a small amount such as 1 tsp.
               - "unit": one of g, kg, ml, l, tsp, tbsp, cup, pcs, or "none". If the written unit is not in this list, convert to the closest one (1 lb is about 450 g, 1 oz is about 30 g).
             """;
 
@@ -36,11 +41,12 @@ public class RecipeFileExtractor {
             """;
 
     private static final String IMAGE_PROMPT = """
-            You are a cooking assistant. The attached image shows a recipe (a screenshot or a photo of a page).
+            You are a cooking assistant. The attached image or images show a recipe (a screenshot, a photo, or scanned pages in order).
             %s
             """;
 
     private final DocumentTextReader documentTextReader;
+    private final PdfPageRenderer pdfPageRenderer;
     private final OllamaChatClient ollamaChatClient;
     private final ObjectMapper objectMapper;
 
@@ -51,22 +57,30 @@ public class RecipeFileExtractor {
 
         String json;
         if (kind == FileKind.IMAGE) {
-            json = ollamaChatClient.chatStructuredWithImage(
-                    IMAGE_PROMPT.formatted(INSTRUCTIONS), content, LlmRecipeSupport.SCHEMA);
+            json = readWithVision(List.of(content));
         } else {
             String text = documentTextReader.read(kind, filename, content).trim();
             if (text.isEmpty()) {
-                throw new RecipeExtractionException("No text found in " + subject
-                        + (kind == FileKind.PDF ? " (is it a scanned PDF? try uploading it as an image)" : ""));
+                if (kind != FileKind.PDF) {
+                    throw new RecipeExtractionException("No text found in " + subject);
+                }
+                // A PDF without a text layer is a scan: have the vision model read the rendered pages instead.
+                json = readWithVision(pdfPageRenderer.render(content, MAX_SCANNED_PDF_PAGES));
+            } else {
+                if (text.length() > MAX_TEXT_CHARS) {
+                    text = text.substring(0, MAX_TEXT_CHARS);
+                }
+                json = ollamaChatClient.chatStructured(
+                        DOCUMENT_PROMPT.formatted(INSTRUCTIONS, text), LlmRecipeSupport.SCHEMA);
             }
-            if (text.length() > MAX_TEXT_CHARS) {
-                text = text.substring(0, MAX_TEXT_CHARS);
-            }
-            json = ollamaChatClient.chatStructured(
-                    DOCUMENT_PROMPT.formatted(INSTRUCTIONS, text), LlmRecipeSupport.SCHEMA);
         }
 
         return LlmRecipeSupport.parse(objectMapper, json, subject, fallbackTitle);
+    }
+
+    private String readWithVision(List<byte[]> images) {
+        return ollamaChatClient.chatStructuredWithImages(
+                IMAGE_PROMPT.formatted(INSTRUCTIONS), images, LlmRecipeSupport.SCHEMA);
     }
 
     private String stripExtension(String filename) {
