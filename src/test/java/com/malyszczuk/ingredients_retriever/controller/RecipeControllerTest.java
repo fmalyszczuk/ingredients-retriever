@@ -1,5 +1,9 @@
 package com.malyszczuk.ingredients_retriever.controller;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.doThrow;
+import java.util.NoSuchElementException;
 import com.malyszczuk.ingredients_retriever.domain.Ingredient;
 import com.malyszczuk.ingredients_retriever.domain.Recipe;
 import com.malyszczuk.ingredients_retriever.domain.RecipeSource;
@@ -185,5 +189,49 @@ class RecipeControllerTest {
         mockMvc.perform(get("/recipes"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].title").value("Pancakes"));
+    }
+
+    @Test
+    void getRecipe_returnsRecipe() throws Exception {
+        Recipe recipe = Recipe.builder().id(7L).title("Pancakes").sourceType(RecipeSource.MANUAL).build();
+        recipe.setIngredients(List.of(Ingredient.builder().id(1L).name("eggs").recipe(recipe).build()));
+        when(recipeService.getRecipe(7L)).thenReturn(recipe);
+
+        mockMvc.perform(get("/recipes/7"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(7))
+                .andExpect(jsonPath("$.ingredients[0].name").value("eggs"));
+    }
+
+    @Test
+    void getRecipe_returnsNotFound_whenMissing() throws Exception {
+        when(recipeService.getRecipe(9L)).thenThrow(new NoSuchElementException("No recipe with id 9"));
+
+        mockMvc.perform(get("/recipes/9"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deleteRecipe_returnsNoContent_andKeepsShoppingListByDefault() throws Exception {
+        mockMvc.perform(delete("/recipes/7"))
+                .andExpect(status().isNoContent());
+
+        verify(recipeService).deleteRecipe(7L, false);
+    }
+
+    @Test
+    void deleteRecipe_passesRemoveFromShoppingListFlag() throws Exception {
+        mockMvc.perform(delete("/recipes/7").param("removeFromShoppingList", "true"))
+                .andExpect(status().isNoContent());
+
+        verify(recipeService).deleteRecipe(7L, true);
+    }
+
+    @Test
+    void deleteRecipe_returnsNotFound_whenMissing() throws Exception {
+        doThrow(new NoSuchElementException("No recipe with id 9")).when(recipeService).deleteRecipe(9L, false);
+
+        mockMvc.perform(delete("/recipes/9"))
+                .andExpect(status().isNotFound());
     }
 }

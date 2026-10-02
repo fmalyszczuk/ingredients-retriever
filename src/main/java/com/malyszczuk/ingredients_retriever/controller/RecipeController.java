@@ -13,7 +13,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,6 +39,18 @@ public class RecipeController {
         return recipeService.listRecipes().stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @GetMapping("/{id}")
+    public RecipeResponse getRecipe(@PathVariable Long id) {
+        return toResponse(recipeService.getRecipe(id));
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteRecipe(@PathVariable Long id,
+                             @RequestParam(defaultValue = "false") boolean removeFromShoppingList) {
+        recipeService.deleteRecipe(id, removeFromShoppingList);
     }
 
     @PostMapping

@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +33,22 @@ public class RecipeService {
     @Transactional(readOnly = true)
     public List<Recipe> listRecipes() {
         return recipeRepository.findAll();
+    }
+
+    @Transactional(readOnly = true)
+    public Recipe getRecipe(Long id) {
+        return recipeRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("No recipe with id " + id));
+    }
+
+    @Transactional
+    public void deleteRecipe(Long id, boolean removeFromShoppingList) {
+        Recipe recipe = getRecipe(id);
+
+        if (removeFromShoppingList) {
+            shoppingListService.removeIngredients(recipe.getIngredients());
+        }
+        recipeRepository.delete(recipe);
     }
 
     @Transactional

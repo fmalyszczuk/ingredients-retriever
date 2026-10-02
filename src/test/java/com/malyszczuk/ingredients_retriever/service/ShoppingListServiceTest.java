@@ -1,5 +1,7 @@
 package com.malyszczuk.ingredients_retriever.service;
 
+import java.util.List;
+import com.malyszczuk.ingredients_retriever.domain.Ingredient;
 import com.malyszczuk.ingredients_retriever.domain.ShoppingListItem;
 import com.malyszczuk.ingredients_retriever.repository.ShoppingListItemRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -266,5 +268,82 @@ class ShoppingListServiceTest {
         shoppingListService.clearItems();
 
         verify(shoppingListItemRepository).deleteAll();
+    }
+
+    private Ingredient ingredient(String name, String quantity, String unit) {
+        return Ingredient.builder().name(name).quantity(quantity == null ? null : new BigDecimal(quantity)).unit(unit).build();
+    }
+
+    private ShoppingListItem listItem(String name, String quantity, String unit) {
+        return ShoppingListItem.builder().name(name).quantity(quantity == null ? null : new BigDecimal(quantity)).unit(unit).build();
+    }
+
+    @Test
+    void removeIngredients_subtractsQuantity_whenUnitsMatch() {
+        ShoppingListItem flour = listItem("flour", "500", "g");
+        when(shoppingListItemRepository.findByNameIgnoreCase("flour")).thenReturn(Optional.of(flour));
+
+        shoppingListService.removeIngredients(List.of(ingredient("flour", "200", "G")));
+
+        assertEquals(0, new BigDecimal("300").compareTo(flour.getQuantity()));
+        verify(shoppingListItemRepository).save(flour);
+    }
+
+    @Test
+    void removeIngredients_deletesItem_whenNothingIsLeft() {
+        ShoppingListItem eggs = listItem("eggs", "2", "pcs");
+        when(shoppingListItemRepository.findByNameIgnoreCase("eggs")).thenReturn(Optional.of(eggs));
+
+        shoppingListService.removeIngredients(List.of(ingredient("eggs", "3", "pcs")));
+
+        verify(shoppingListItemRepository).delete(eggs);
+        verify(shoppingListItemRepository, never()).save(any());
+    }
+
+    @Test
+    void removeIngredients_convertsWithinSameUnitType() {
+        ShoppingListItem flour = listItem("flour", "2", "kg");
+        when(shoppingListItemRepository.findByNameIgnoreCase("flour")).thenReturn(Optional.of(flour));
+
+        shoppingListService.removeIngredients(List.of(ingredient("flour", "500", "g")));
+
+        assertEquals(0, new BigDecimal("1.5").compareTo(flour.getQuantity()));
+    }
+
+    @Test
+    void removeIngredients_leavesItemAlone_whenUnitsAreIncompatible() {
+        ShoppingListItem milk = listItem("milk", "1", "l");
+        when(shoppingListItemRepository.findByNameIgnoreCase("milk")).thenReturn(Optional.of(milk));
+
+        shoppingListService.removeIngredients(List.of(ingredient("milk", "200", "g")));
+
+        assertEquals(0, BigDecimal.ONE.compareTo(milk.getQuantity()));
+        verify(shoppingListItemRepository, never()).save(any());
+        verify(shoppingListItemRepository, never()).delete(any());
+    }
+
+    @Test
+    void removeIngredients_leavesItemAlone_whenAQuantityIsUnspecified() {
+        ShoppingListItem salt = listItem("salt", null, null);
+        ShoppingListItem pepper = listItem("pepper", "5", "g");
+        when(shoppingListItemRepository.findByNameIgnoreCase("salt")).thenReturn(Optional.of(salt));
+        when(shoppingListItemRepository.findByNameIgnoreCase("pepper")).thenReturn(Optional.of(pepper));
+
+        shoppingListService.removeIngredients(List.of(ingredient("salt", "1", "tsp"), ingredient("pepper", null, null)));
+
+        assertNull(salt.getQuantity());
+        assertEquals(0, new BigDecimal("5").compareTo(pepper.getQuantity()));
+        verify(shoppingListItemRepository, never()).save(any());
+        verify(shoppingListItemRepository, never()).delete(any());
+    }
+
+    @Test
+    void removeIngredients_ignoresIngredientsNotOnTheList() {
+        when(shoppingListItemRepository.findByNameIgnoreCase("saffron")).thenReturn(Optional.empty());
+
+        shoppingListService.removeIngredients(List.of(ingredient("saffron", "1", "g")));
+
+        verify(shoppingListItemRepository, never()).save(any());
+        verify(shoppingListItemRepository, never()).delete(any());
     }
 }

@@ -14,8 +14,8 @@ Frontend repo: https://github.com/fmalyszczuk/pantrypal-frontend
 
 - Add recipes by URL (scrapes the page's `schema.org/Recipe` data), by dish
   name ("spaghetti carbonara" — the local LLM suggests a typical ingredient
-  list), from an uploaded file (PDF, DOCX, TXT, or a screenshot/photo read by
-  a local vision model), or type ingredients in by hand.
+  list), from an uploaded file (PDF, DOCX, TXT, or a screenshot, photo or
+  scanned PDF read by a local vision model), or type ingredients in by hand.
 - A merged shopping list that sums quantities for repeated ingredients.
 - Mark items purchased, edit quantity/unit, or clear the whole list.
 - Automatic unit conversion within the same unit family (weight: mg/g/kg/lb,
@@ -69,6 +69,8 @@ Run the tests with:
 | `DELETE` | `/shopping-list/items/{name}` | Remove one item |
 | `DELETE` | `/shopping-list` | Clear the whole list |
 | `GET` | `/recipes` | List saved recipes |
+| `GET` | `/recipes/{id}` | Get one recipe |
+| `DELETE` | `/recipes/{id}` | Delete a recipe (`?removeFromShoppingList=true` also subtracts its ingredients from the list) |
 | `POST` | `/recipes` | Add a recipe by typing in its ingredients |
 | `POST` | `/recipes/from-url` | Add a recipe by scraping a recipe page |
 | `POST` | `/recipes/from-text` | Add a recipe from a dish name (LLM-suggested ingredients) |

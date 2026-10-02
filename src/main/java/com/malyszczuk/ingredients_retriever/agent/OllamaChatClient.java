@@ -25,10 +25,10 @@ public class OllamaChatClient {
                 ollamaProperties.model(), List.of(OllamaMessage.user(prompt)), null, false, jsonSchema)));
     }
 
-    /** Same as {@link #chatStructured}, but shows the given image to the configured vision model. */
-    public String chatStructuredWithImage(String prompt, byte[] image, Map<String, Object> jsonSchema) {
+    /** Same as {@link #chatStructured}, but shows the given images to the configured vision model. */
+    public String chatStructuredWithImages(String prompt, List<byte[]> images, Map<String, Object> jsonSchema) {
         return contentOf(send(new OllamaChatRequest(
-                ollamaProperties.visionModel(), List.of(OllamaMessage.userWithImage(prompt, image)), null, false, jsonSchema)));
+                ollamaProperties.visionModel(), List.of(OllamaMessage.userWithImages(prompt, images)), null, false, jsonSchema)));
     }
 
     private OllamaChatResponse send(OllamaChatRequest request) {
