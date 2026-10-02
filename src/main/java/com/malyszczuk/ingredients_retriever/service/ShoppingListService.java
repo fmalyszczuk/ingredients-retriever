@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
@@ -38,23 +39,36 @@ public class ShoppingListService {
             throw new IllegalArgumentException("Ingredient name must not be blank");
         }
 
+        String normalizedUnit = normalize(unit);
         Optional<ShoppingListItem> existing = shoppingListItemRepository.findByNameIgnoreCase(normalizedName);
 
-        ShoppingListItem item;
-        if (existing.isPresent()) {
-            item = existing.get();
-            item.setQuantity(sumQuantities(item.getQuantity(), quantity));
-            if (item.getUnit() == null) {
-                item.setUnit(normalize(unit));
-            }
-        } else {
-            item = ShoppingListItem.builder()
+        if (existing.isEmpty()) {
+            return shoppingListItemRepository.save(ShoppingListItem.builder()
                     .name(normalizedName)
                     .quantity(quantity)
-                    .unit(normalize(unit))
-                    .build();
+                    .unit(normalizedUnit)
+                    .build());
         }
 
+        ShoppingListItem item = existing.get();
+        if (quantity == null || item.getQuantity() == null) {
+            item.setQuantity(null);
+            if (item.getUnit() == null) {
+                item.setUnit(normalizedUnit);
+            }
+            return shoppingListItemRepository.save(item);
+        }
+
+        if (!sameKind(item.getUnit(), normalizedUnit)) {
+            // One row holds one quantity in one unit, so amounts that can't be added (e.g. pcs vs g) live in a
+            // separate row instead of being summed into nonsense or dropped.
+            return addItem(variantName(normalizedName, normalizedUnit), quantity, normalizedUnit);
+        }
+
+        item.setQuantity(item.getQuantity().add(amountInUnitOf(item, quantity, normalizedUnit)));
+        if (item.getUnit() == null) {
+            item.setUnit(normalizedUnit);
+        }
         return shoppingListItemRepository.save(item);
     }
 
@@ -113,31 +127,24 @@ public class ShoppingListService {
 
     /**
      * Reverses {@link #addIngredients}: subtracts each ingredient's quantity from the matching list item, and drops
-     * the item once nothing is left. Ingredients that can't be subtracted safely are left alone: no matching item,
-     * an unspecified quantity on either side, or units that are different and not convertible.
+     * the item once nothing is left. Ingredients that can't be subtracted safely are left alone: no matching item
+     * (in the same unit family, see {@link #findMatching}) or an unspecified quantity on either side.
      */
     @Transactional
     public void removeIngredients(List<Ingredient> ingredients) {
         for (Ingredient ingredient : ingredients) {
-            shoppingListItemRepository.findByNameIgnoreCase(normalize(ingredient.getName()))
-                    .ifPresent(item -> subtract(item, ingredient));
+            String unit = normalize(ingredient.getUnit());
+            findMatching(normalize(ingredient.getName()), unit)
+                    .ifPresent(item -> subtract(item, ingredient.getQuantity(), unit));
         }
     }
 
-    private void subtract(ShoppingListItem item, Ingredient ingredient) {
-        if (item.getQuantity() == null || ingredient.getQuantity() == null) {
+    private void subtract(ShoppingListItem item, BigDecimal quantity, String unit) {
+        if (item.getQuantity() == null || quantity == null) {
             return;
         }
 
-        BigDecimal amount = ingredient.getQuantity();
-        if (!sameUnit(item.getUnit(), ingredient.getUnit())) {
-            if (!unitConverter.canConvert(ingredient.getUnit(), item.getUnit())) {
-                return;
-            }
-            amount = unitConverter.convert(amount, ingredient.getUnit(), item.getUnit());
-        }
-
-        BigDecimal remaining = item.getQuantity().subtract(amount);
+        BigDecimal remaining = item.getQuantity().subtract(amountInUnitOf(item, quantity, unit));
         if (remaining.signum() <= 0) {
             shoppingListItemRepository.delete(item);
         } else {
@@ -146,8 +153,14 @@ public class ShoppingListService {
         }
     }
 
-    private boolean sameUnit(String first, String second) {
-        return first == null ? second == null : first.equalsIgnoreCase(second);
+    /** The row {@link #addItem} would have merged an ingredient with this name and unit into, if there is one. */
+    private Optional<ShoppingListItem> findMatching(String name, String unit) {
+        Optional<ShoppingListItem> primary = shoppingListItemRepository.findByNameIgnoreCase(name);
+        if (primary.isPresent() && sameKind(primary.get().getUnit(), unit)) {
+            return primary;
+        }
+        return shoppingListItemRepository.findByNameIgnoreCase(variantName(name, unit))
+                .filter(variant -> sameKind(variant.getUnit(), unit));
     }
 
     @Transactional
@@ -155,11 +168,37 @@ public class ShoppingListService {
         shoppingListItemRepository.deleteAll();
     }
 
-    private BigDecimal sumQuantities(BigDecimal current, BigDecimal addition) {
-        if (current == null || addition == null) {
-            return null;
+    /** Two units can share a row when one converts to the other (same weight/volume family) or both count the same thing. */
+    private boolean sameKind(String itemUnit, String unit) {
+        return unitConverter.canConvert(itemUnit, unit) || countUnit(itemUnit).equals(countUnit(unit));
+    }
+
+    /** The amount expressed in the item's own unit; only converts when the units differ but are the same family. */
+    private BigDecimal amountInUnitOf(ShoppingListItem item, BigDecimal quantity, String unit) {
+        if (unitConverter.canConvert(unit, item.getUnit()) && !countUnit(unit).equals(countUnit(item.getUnit()))) {
+            return unitConverter.convert(quantity, unit, item.getUnit());
         }
-        return current.add(addition);
+        return quantity;
+    }
+
+    /** Name of the extra row for amounts that can't be added to the main one, e.g. "onion (weight)". */
+    private String variantName(String name, String unit) {
+        UnitConverter.UnitType type = unitConverter.typeOf(unit);
+        String kind = type != null ? type.name().toLowerCase(Locale.ROOT) : countUnit(unit);
+        return name + " (" + kind + ")";
+    }
+
+    // No unit means "pieces", and singular/plural spellings of a unit are the same unit.
+    private String countUnit(String unit) {
+        if (unit == null || unit.isBlank()) {
+            return "pcs";
+        }
+        String lower = unit.trim().toLowerCase(Locale.ROOT);
+        if (lower.equals("pc") || lower.equals("piece") || lower.equals("pieces")) {
+            return "pcs";
+        }
+        boolean plural = lower.length() > 3 && lower.endsWith("s") && !lower.endsWith("ss");
+        return plural ? lower.substring(0, lower.length() - 1) : lower;
     }
 
     private String normalize(String value) {
