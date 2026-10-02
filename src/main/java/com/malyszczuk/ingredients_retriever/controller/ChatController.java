@@ -28,7 +28,8 @@ public class ChatController {
     public ChatResponse chat(@Valid @RequestBody ChatRequest request) {
         String conversationId = request.conversationId() != null ? request.conversationId() : UUID.randomUUID().toString();
         ChatResult result = chatAgentService.chat(conversationId, request.message());
-        return new ChatResponse(result.reply(), conversationId, result.shoppingListChanged(), result.actions());
+        return new ChatResponse(result.reply(), conversationId, result.shoppingListChanged(), result.incomplete(),
+                result.actions());
     }
 
     @DeleteMapping("/{conversationId}")
