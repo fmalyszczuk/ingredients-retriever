@@ -69,6 +69,8 @@ Run the tests with:
 | `DELETE` | `/shopping-list/items/{name}` | Remove one item |
 | `DELETE` | `/shopping-list` | Clear the whole list |
 | `GET` | `/recipes` | List saved recipes |
+| `GET` | `/recipes/{id}` | Get one recipe |
+| `DELETE` | `/recipes/{id}` | Delete a recipe (`?removeFromShoppingList=true` also subtracts its ingredients from the list) |
 | `POST` | `/recipes` | Add a recipe by typing in its ingredients |
 | `POST` | `/recipes/from-url` | Add a recipe by scraping a recipe page |
 | `POST` | `/recipes/from-text` | Add a recipe from a dish name (LLM-suggested ingredients) |

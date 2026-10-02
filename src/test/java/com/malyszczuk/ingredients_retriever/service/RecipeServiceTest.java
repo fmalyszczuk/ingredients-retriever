@@ -1,5 +1,10 @@
 package com.malyszczuk.ingredients_retriever.service;
 
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.never;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import java.util.Optional;
+import java.util.NoSuchElementException;
 import com.malyszczuk.ingredients_retriever.domain.Ingredient;
 import com.malyszczuk.ingredients_retriever.domain.Recipe;
 import com.malyszczuk.ingredients_retriever.domain.RecipeSource;
@@ -127,5 +132,52 @@ class RecipeServiceTest {
         assertEquals("eggs", result.getIngredients().getFirst().getName());
         assertEquals("flour", result.getIngredients().get(1).getName());
         assertEquals("g", result.getIngredients().get(1).getUnit());
+    }
+
+    @Test
+    void getRecipe_returnsRecipe_whenPresent() {
+        Recipe recipe = Recipe.builder().id(1L).title("Pancakes").sourceType(RecipeSource.MANUAL).build();
+        when(recipeRepository.findById(1L)).thenReturn(Optional.of(recipe));
+
+        assertSame(recipe, recipeService.getRecipe(1L));
+    }
+
+    @Test
+    void getRecipe_throws_whenMissing() {
+        when(recipeRepository.findById(9L)).thenReturn(Optional.empty());
+
+        assertThrows(NoSuchElementException.class, () -> recipeService.getRecipe(9L));
+    }
+
+    @Test
+    void deleteRecipe_deletesOnly_byDefault() {
+        Recipe recipe = Recipe.builder().id(1L).title("Pancakes").sourceType(RecipeSource.MANUAL).build();
+        when(recipeRepository.findById(1L)).thenReturn(Optional.of(recipe));
+
+        recipeService.deleteRecipe(1L, false);
+
+        verify(recipeRepository).delete(recipe);
+        verifyNoInteractions(shoppingListService);
+    }
+
+    @Test
+    void deleteRecipe_alsoRemovesIngredientsFromShoppingList_whenRequested() {
+        Recipe recipe = Recipe.builder().id(1L).title("Pancakes").sourceType(RecipeSource.MANUAL).build();
+        recipe.addIngredient(Ingredient.builder().name("flour").quantity(BigDecimal.valueOf(200)).unit("g").build());
+        when(recipeRepository.findById(1L)).thenReturn(Optional.of(recipe));
+
+        recipeService.deleteRecipe(1L, true);
+
+        verify(shoppingListService).removeIngredients(recipe.getIngredients());
+        verify(recipeRepository).delete(recipe);
+    }
+
+    @Test
+    void deleteRecipe_throwsAndDeletesNothing_whenMissing() {
+        when(recipeRepository.findById(9L)).thenReturn(Optional.empty());
+
+        assertThrows(NoSuchElementException.class, () -> recipeService.deleteRecipe(9L, true));
+        verify(recipeRepository, never()).delete(any());
+        verifyNoInteractions(shoppingListService);
     }
 }

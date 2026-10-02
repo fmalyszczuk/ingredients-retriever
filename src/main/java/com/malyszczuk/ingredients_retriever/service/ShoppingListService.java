@@ -111,6 +111,45 @@ public class ShoppingListService {
                 .ifPresent(shoppingListItemRepository::delete);
     }
 
+    /**
+     * Reverses {@link #addIngredients}: subtracts each ingredient's quantity from the matching list item, and drops
+     * the item once nothing is left. Ingredients that can't be subtracted safely are left alone: no matching item,
+     * an unspecified quantity on either side, or units that are different and not convertible.
+     */
+    @Transactional
+    public void removeIngredients(List<Ingredient> ingredients) {
+        for (Ingredient ingredient : ingredients) {
+            shoppingListItemRepository.findByNameIgnoreCase(normalize(ingredient.getName()))
+                    .ifPresent(item -> subtract(item, ingredient));
+        }
+    }
+
+    private void subtract(ShoppingListItem item, Ingredient ingredient) {
+        if (item.getQuantity() == null || ingredient.getQuantity() == null) {
+            return;
+        }
+
+        BigDecimal amount = ingredient.getQuantity();
+        if (!sameUnit(item.getUnit(), ingredient.getUnit())) {
+            if (!unitConverter.canConvert(ingredient.getUnit(), item.getUnit())) {
+                return;
+            }
+            amount = unitConverter.convert(amount, ingredient.getUnit(), item.getUnit());
+        }
+
+        BigDecimal remaining = item.getQuantity().subtract(amount);
+        if (remaining.signum() <= 0) {
+            shoppingListItemRepository.delete(item);
+        } else {
+            item.setQuantity(remaining);
+            shoppingListItemRepository.save(item);
+        }
+    }
+
+    private boolean sameUnit(String first, String second) {
+        return first == null ? second == null : first.equalsIgnoreCase(second);
+    }
+
     @Transactional
     public void clearItems() {
         shoppingListItemRepository.deleteAll();
