@@ -1,4 +1,4 @@
 package com.malyszczuk.ingredients_retriever.dto;
 
-public record ChatResponse(String reply) {
+public record ChatResponse(String reply, String conversationId) {
 }

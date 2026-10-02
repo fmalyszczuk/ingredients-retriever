@@ -11,9 +11,15 @@ public record OllamaChatRequest(
         List<OllamaMessage> messages,
         List<OllamaTool> tools,
         boolean stream,
-        Map<String, Object> format
+        Map<String, Object> format,
+        Map<String, Object> options
 ) {
     public OllamaChatRequest(String model, List<OllamaMessage> messages, List<OllamaTool> tools, boolean stream) {
-        this(model, messages, tools, stream, null);
+        this(model, messages, tools, stream, null, null);
+    }
+
+    public OllamaChatRequest(String model, List<OllamaMessage> messages, List<OllamaTool> tools, boolean stream,
+                             Map<String, Object> format) {
+        this(model, messages, tools, stream, format, null);
     }
 }

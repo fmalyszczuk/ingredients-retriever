@@ -16,7 +16,8 @@ public class OllamaChatClient {
     private final OllamaProperties ollamaProperties;
 
     public OllamaChatResponse chat(List<OllamaMessage> messages, List<OllamaTool> tools) {
-        return send(new OllamaChatRequest(ollamaProperties.model(), messages, tools, false));
+        return send(new OllamaChatRequest(ollamaProperties.model(), messages, tools, false, null,
+                Map.of("temperature", ollamaProperties.chatTemperature())));
     }
 
     /** Asks the model for a single reply constrained to the given JSON schema and returns its raw JSON content. */

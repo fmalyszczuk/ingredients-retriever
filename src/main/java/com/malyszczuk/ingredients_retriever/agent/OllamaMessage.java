@@ -17,8 +17,16 @@ public record OllamaMessage(
         this(role, content, toolCalls, null);
     }
 
+    public static OllamaMessage system(String content) {
+        return new OllamaMessage("system", content, null);
+    }
+
     public static OllamaMessage user(String content) {
         return new OllamaMessage("user", content, null);
+    }
+
+    public static OllamaMessage assistant(String content) {
+        return new OllamaMessage("assistant", content, null);
     }
 
     public static OllamaMessage userWithImages(String content, List<byte[]> images) {

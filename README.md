@@ -23,7 +23,8 @@ Frontend repo: https://github.com/fmalyszczuk/pantrypal-frontend
   alone since they can't be converted.
 - A `/chat` endpoint that runs a local LLM tool-calling loop against the
   real shopping-list service, so natural-language requests actually change
-  the data.
+  the data. It remembers the conversation (send back the `conversationId` it
+  returns), so follow-ups like "make it 3 kg" work.
 
 ## Tech stack
 
@@ -75,7 +76,8 @@ Run the tests with:
 | `POST` | `/recipes/from-url` | Add a recipe by scraping a recipe page |
 | `POST` | `/recipes/from-text` | Add a recipe from a dish name (LLM-suggested ingredients) |
 | `POST` | `/recipes/from-file` | Add a recipe from an uploaded PDF, DOCX, TXT or image (multipart, field `file`) |
-| `POST` | `/chat` | Talk to the shopping list in plain English |
+| `POST` | `/chat` | Talk to the shopping list in plain English (optional `conversationId` for memory) |
+| `DELETE` | `/chat/{conversationId}` | Forget a conversation |
 
 ## Project layout
 
