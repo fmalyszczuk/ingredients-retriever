@@ -13,14 +13,25 @@ public class ClearShoppingListTool implements AgentTool {
     private final ShoppingListService shoppingListService;
 
     @Override
+    public boolean changesShoppingList() {
+        return true;
+    }
+
+    @Override
+    public boolean requiresConfirmation() {
+        return true;
+    }
+
+    @Override
     public String name() {
         return "clear_shopping_list";
     }
 
     @Override
     public String description() {
-        return "Removes every item from the shopping list. This cannot be undone, "
-                + "so only call it when the user clearly asks to clear, empty, or reset the whole list.";
+        return "Removes every item from the shopping list. This cannot be undone, so only call it when the user "
+                + "clearly asks to clear, empty, or reset the whole list. The first call only asks the user for "
+                + "confirmation and deletes nothing; call it again after the user confirms.";
     }
 
     @Override

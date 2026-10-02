@@ -17,6 +17,11 @@ public class AddItemTool implements AgentTool {
     private final ShoppingListService shoppingListService;
 
     @Override
+    public boolean changesShoppingList() {
+        return true;
+    }
+
+    @Override
     public String name() {
         return "add_item";
     }

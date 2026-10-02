@@ -95,4 +95,35 @@ class ConversationStoreTest {
         assertThrows(UnsupportedOperationException.class, () -> store.history("c1").clear());
         assertEquals(2, store.history("c1").size());
     }
+
+    @Test
+    void takePendingConfirmations_returnsThemOnce() {
+        ConversationStore store = new ConversationStore();
+        store.setPendingConfirmations("c1", java.util.Set.of("clear_shopping_list"));
+
+        assertEquals(java.util.Set.of("clear_shopping_list"), store.takePendingConfirmations("c1"));
+        assertTrue(store.takePendingConfirmations("c1").isEmpty());
+    }
+
+    @Test
+    void setPendingConfirmations_withNoToolsClearsWhatWasPending() {
+        ConversationStore store = new ConversationStore();
+        store.setPendingConfirmations("c1", java.util.Set.of("clear_shopping_list"));
+
+        store.setPendingConfirmations("c1", java.util.Set.of());
+
+        assertTrue(store.takePendingConfirmations("c1").isEmpty());
+    }
+
+    @Test
+    void pendingConfirmations_areKeptPerConversation_andForgottenOnClear() {
+        ConversationStore store = new ConversationStore();
+        store.setPendingConfirmations("a", java.util.Set.of("clear_shopping_list"));
+        store.setPendingConfirmations("b", java.util.Set.of("clear_shopping_list"));
+
+        store.clear("a");
+
+        assertTrue(store.takePendingConfirmations("a").isEmpty());
+        assertEquals(1, store.takePendingConfirmations("b").size());
+    }
 }

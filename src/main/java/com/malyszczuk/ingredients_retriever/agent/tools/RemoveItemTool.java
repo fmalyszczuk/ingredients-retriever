@@ -14,6 +14,11 @@ public class RemoveItemTool implements AgentTool {
     private final ShoppingListService shoppingListService;
 
     @Override
+    public boolean changesShoppingList() {
+        return true;
+    }
+
+    @Override
     public String name() {
         return "remove_item";
     }

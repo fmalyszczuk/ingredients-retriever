@@ -1,6 +1,7 @@
 package com.malyszczuk.ingredients_retriever.controller;
 
 import com.malyszczuk.ingredients_retriever.agent.ChatAgentService;
+import com.malyszczuk.ingredients_retriever.agent.ChatResult;
 import com.malyszczuk.ingredients_retriever.dto.ChatRequest;
 import com.malyszczuk.ingredients_retriever.dto.ChatResponse;
 import jakarta.validation.Valid;
@@ -26,8 +27,8 @@ public class ChatController {
     @PostMapping
     public ChatResponse chat(@Valid @RequestBody ChatRequest request) {
         String conversationId = request.conversationId() != null ? request.conversationId() : UUID.randomUUID().toString();
-        String reply = chatAgentService.chat(conversationId, request.message());
-        return new ChatResponse(reply, conversationId);
+        ChatResult result = chatAgentService.chat(conversationId, request.message());
+        return new ChatResponse(result.reply(), conversationId, result.shoppingListChanged(), result.actions());
     }
 
     @DeleteMapping("/{conversationId}")

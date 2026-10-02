@@ -1,6 +1,8 @@
 package com.malyszczuk.ingredients_retriever.controller;
 
 import com.malyszczuk.ingredients_retriever.agent.ChatAgentService;
+import com.malyszczuk.ingredients_retriever.agent.ChatResult;
+import com.malyszczuk.ingredients_retriever.dto.ChatAction;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -8,6 +10,9 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.client.ResourceAccessException;
+
+import java.util.List;
+import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -30,26 +35,33 @@ class ChatControllerTest {
 
     @Test
     void chat_startsANewConversationAndReturnsItsId_whenNoneIsGiven() throws Exception {
-        when(chatAgentService.chat(any(), eq("add eggs"))).thenReturn("Added eggs.");
+        when(chatAgentService.chat(any(), eq("add eggs"))).thenReturn(new ChatResult("Added eggs.",
+                List.of(new ChatAction("add_item", Map.of("name", "eggs"), ChatAction.OK, Map.of("name", "eggs"))), true));
 
         mockMvc.perform(post("/chat")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"message\": \"add eggs\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reply").value("Added eggs."))
-                .andExpect(jsonPath("$.conversationId").isNotEmpty());
+                .andExpect(jsonPath("$.conversationId").isNotEmpty())
+                .andExpect(jsonPath("$.shoppingListChanged").value(true))
+                .andExpect(jsonPath("$.actions[0].tool").value("add_item"))
+                .andExpect(jsonPath("$.actions[0].status").value("ok"))
+                .andExpect(jsonPath("$.actions[0].result.name").value("eggs"));
     }
 
     @Test
     void chat_continuesTheGivenConversation() throws Exception {
-        when(chatAgentService.chat("abc-123", "and milk")).thenReturn("Added milk.");
+        when(chatAgentService.chat("abc-123", "and milk")).thenReturn(new ChatResult("Added milk.", List.of(), false));
 
         mockMvc.perform(post("/chat")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"message\": \"and milk\", \"conversationId\": \"abc-123\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reply").value("Added milk."))
-                .andExpect(jsonPath("$.conversationId").value("abc-123"));
+                .andExpect(jsonPath("$.conversationId").value("abc-123"))
+                .andExpect(jsonPath("$.shoppingListChanged").value(false))
+                .andExpect(jsonPath("$.actions").isEmpty());
     }
 
     @Test

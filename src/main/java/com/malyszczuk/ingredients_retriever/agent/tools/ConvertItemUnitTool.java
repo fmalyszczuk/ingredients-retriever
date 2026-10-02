@@ -16,6 +16,11 @@ public class ConvertItemUnitTool implements AgentTool {
     private final ShoppingListService shoppingListService;
 
     @Override
+    public boolean changesShoppingList() {
+        return true;
+    }
+
+    @Override
     public String name() {
         return "convert_item_unit";
     }
