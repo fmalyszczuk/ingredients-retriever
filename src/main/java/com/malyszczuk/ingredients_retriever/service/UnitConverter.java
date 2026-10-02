@@ -46,6 +46,12 @@ public class UnitConverter {
         }
     }
 
+    /** The unit family (weight or volume) of a known unit, or null for count/custom/unknown units. */
+    public UnitType typeOf(String unit) {
+        UnitDefinition definition = lookup(unit);
+        return definition == null ? null : definition.type();
+    }
+
     public boolean supports(String unit) {
         return lookup(unit) != null;
     }

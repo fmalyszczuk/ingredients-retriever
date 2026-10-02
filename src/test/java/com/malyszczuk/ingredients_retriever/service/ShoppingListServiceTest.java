@@ -328,6 +328,8 @@ class ShoppingListServiceTest {
         ShoppingListItem pepper = listItem("pepper", "5", "g");
         when(shoppingListItemRepository.findByNameIgnoreCase("salt")).thenReturn(Optional.of(salt));
         when(shoppingListItemRepository.findByNameIgnoreCase("pepper")).thenReturn(Optional.of(pepper));
+        when(shoppingListItemRepository.findByNameIgnoreCase("salt (volume)")).thenReturn(Optional.empty());
+        when(shoppingListItemRepository.findByNameIgnoreCase("pepper (pcs)")).thenReturn(Optional.empty());
 
         shoppingListService.removeIngredients(List.of(ingredient("salt", "1", "tsp"), ingredient("pepper", null, null)));
 
@@ -345,5 +347,122 @@ class ShoppingListServiceTest {
 
         verify(shoppingListItemRepository, never()).save(any());
         verify(shoppingListItemRepository, never()).delete(any());
+    }
+
+    @Test
+    void addItem_convertsIncomingAmountIntoTheExistingUnit_forWeights() {
+        ShoppingListItem sugar = listItem("sugar", "200", "g");
+        when(shoppingListItemRepository.findByNameIgnoreCase("sugar")).thenReturn(Optional.of(sugar));
+        when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShoppingListItem result = shoppingListService.addItem("sugar", BigDecimal.ONE, "kg");
+
+        assertEquals("g", result.getUnit());
+        assertEquals(0, new BigDecimal("1200").compareTo(result.getQuantity()));
+    }
+
+    @Test
+    void addItem_keepsTheExistingUnit_whenItIsTheLargerOne() {
+        ShoppingListItem flour = listItem("flour", "1", "kg");
+        when(shoppingListItemRepository.findByNameIgnoreCase("flour")).thenReturn(Optional.of(flour));
+        when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShoppingListItem result = shoppingListService.addItem("flour", new BigDecimal("500"), "g");
+
+        assertEquals("kg", result.getUnit());
+        assertEquals(0, new BigDecimal("1.5").compareTo(result.getQuantity()));
+    }
+
+    @Test
+    void addItem_convertsWithinVolumeUnits() {
+        ShoppingListItem milk = listItem("milk", "1", "cup");
+        when(shoppingListItemRepository.findByNameIgnoreCase("milk")).thenReturn(Optional.of(milk));
+        when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShoppingListItem result = shoppingListService.addItem("milk", new BigDecimal("473.176"), "ml");
+
+        assertEquals("cup", result.getUnit());
+        assertEquals(0, new BigDecimal("3").compareTo(result.getQuantity().setScale(0, java.math.RoundingMode.HALF_UP)));
+    }
+
+    @Test
+    void addItem_treatsMissingUnitAsPieces() {
+        ShoppingListItem eggs = listItem("eggs", "2", null);
+        when(shoppingListItemRepository.findByNameIgnoreCase("eggs")).thenReturn(Optional.of(eggs));
+        when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShoppingListItem result = shoppingListService.addItem("eggs", new BigDecimal("3"), "pcs");
+
+        assertEquals("pcs", result.getUnit());
+        assertEquals(0, new BigDecimal("5").compareTo(result.getQuantity()));
+    }
+
+    @Test
+    void addItem_treatsSingularAndPluralCountUnitsAsTheSame() {
+        ShoppingListItem garlic = listItem("garlic", "2", "cloves");
+        when(shoppingListItemRepository.findByNameIgnoreCase("garlic")).thenReturn(Optional.of(garlic));
+        when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShoppingListItem result = shoppingListService.addItem("garlic", BigDecimal.ONE, "clove");
+
+        assertEquals(0, new BigDecimal("3").compareTo(result.getQuantity()));
+        assertEquals("cloves", result.getUnit());
+    }
+
+    @Test
+    void addItem_putsIncompatibleUnitsInTheirOwnRow_insteadOfSummingThem() {
+        ShoppingListItem onion = listItem("onion", "1", "pcs");
+        when(shoppingListItemRepository.findByNameIgnoreCase("onion")).thenReturn(Optional.of(onion));
+        when(shoppingListItemRepository.findByNameIgnoreCase("onion (weight)")).thenReturn(Optional.empty());
+        when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShoppingListItem result = shoppingListService.addItem("onion", new BigDecimal("200"), "g");
+
+        assertEquals("onion (weight)", result.getName());
+        assertEquals("g", result.getUnit());
+        assertEquals(0, new BigDecimal("200").compareTo(result.getQuantity()));
+        assertEquals(0, BigDecimal.ONE.compareTo(onion.getQuantity()));
+        assertEquals("pcs", onion.getUnit());
+    }
+
+    @Test
+    void addItem_mergesIntoTheExistingVariantRow_andConvertsThere() {
+        ShoppingListItem onion = listItem("onion", "1", "pcs");
+        ShoppingListItem onionWeight = listItem("onion (weight)", "200", "g");
+        when(shoppingListItemRepository.findByNameIgnoreCase("onion")).thenReturn(Optional.of(onion));
+        when(shoppingListItemRepository.findByNameIgnoreCase("onion (weight)")).thenReturn(Optional.of(onionWeight));
+        when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShoppingListItem result = shoppingListService.addItem("onion", BigDecimal.ONE, "kg");
+
+        assertEquals("onion (weight)", result.getName());
+        assertEquals("g", result.getUnit());
+        assertEquals(0, new BigDecimal("1200").compareTo(result.getQuantity()));
+        assertEquals(0, BigDecimal.ONE.compareTo(onion.getQuantity()));
+    }
+
+    @Test
+    void addItem_putsWeightAgainstVolumeInItsOwnRow() {
+        ShoppingListItem milk = listItem("milk", "1", "l");
+        when(shoppingListItemRepository.findByNameIgnoreCase("milk")).thenReturn(Optional.of(milk));
+        when(shoppingListItemRepository.findByNameIgnoreCase("milk (weight)")).thenReturn(Optional.empty());
+        when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShoppingListItem result = shoppingListService.addItem("milk", new BigDecimal("100"), "g");
+
+        assertEquals("milk (weight)", result.getName());
+    }
+
+    @Test
+    void removeIngredients_subtractsFromTheVariantRow_whenThePrimaryRowIsAnotherUnitFamily() {
+        ShoppingListItem onion = listItem("onion", "1", "pcs");
+        ShoppingListItem onionWeight = listItem("onion (weight)", "300", "g");
+        when(shoppingListItemRepository.findByNameIgnoreCase("onion")).thenReturn(Optional.of(onion));
+        when(shoppingListItemRepository.findByNameIgnoreCase("onion (weight)")).thenReturn(Optional.of(onionWeight));
+
+        shoppingListService.removeIngredients(List.of(ingredient("onion", "100", "g")));
+
+        assertEquals(0, new BigDecimal("200").compareTo(onionWeight.getQuantity()));
+        assertEquals(0, BigDecimal.ONE.compareTo(onion.getQuantity()));
     }
 }
