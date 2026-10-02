@@ -24,4 +24,18 @@ public interface AgentTool {
     default boolean requiresConfirmation() {
         return false;
     }
+
+    /**
+     * What a confirmation applies to, for tools that act on a specific thing (e.g. the id of the recipe to delete).
+     * A confirmation only covers the same tool with the same target, so "yes" to deleting one recipe can't be used
+     * to delete another. Tools with nothing to target return an empty string.
+     */
+    default String confirmationTarget(Map<String, Object> arguments) {
+        return "";
+    }
+
+    /** A short description of exactly what would happen, shown to the model so it asks the user a precise question. */
+    default String confirmationDescription(Map<String, Object> arguments) {
+        return "";
+    }
 }

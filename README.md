@@ -26,9 +26,10 @@ Frontend repo: https://github.com/fmalyszczuk/pantrypal-frontend
 - A `/chat` endpoint that runs a local LLM tool-calling loop against the
   real shopping-list service, so natural-language requests actually change
   the data. It remembers the conversation (send back the `conversationId` it
-  returns), so follow-ups like "make it 3 kg" work. Each response says which
-  tools actually ran and whether the list changed, and wiping the whole list
-  through chat needs an explicit "yes" first.
+  returns), so follow-ups like "make it 3 kg" work. It can also add a recipe
+  (a dish name or URL), list recipes and delete one. Each response says which
+  tools actually ran and whether the list changed, and destructive actions
+  (clearing the list, deleting a recipe) need an explicit "yes" first.
 
 ## Tech stack
 

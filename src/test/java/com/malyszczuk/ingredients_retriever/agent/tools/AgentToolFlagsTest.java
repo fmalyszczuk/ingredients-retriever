@@ -14,16 +14,22 @@ class AgentToolFlagsTest {
         assertTrue(new UpdateItemTool(null).changesShoppingList());
         assertTrue(new ConvertItemUnitTool(null).changesShoppingList());
         assertTrue(new ClearShoppingListTool(null).changesShoppingList());
+        assertTrue(new AddRecipeTool(null).changesShoppingList());
+        assertTrue(new DeleteRecipeTool(null).changesShoppingList());
     }
 
     @Test
     void readOnlyToolsDoNot() {
         assertFalse(new ListItemsTool(null).changesShoppingList());
+        assertFalse(new ListRecipesTool(null).changesShoppingList());
     }
 
     @Test
-    void onlyClearingTheWholeListRequiresConfirmation() {
+    void onlyDestructiveToolsRequireConfirmation() {
         assertTrue(new ClearShoppingListTool(null).requiresConfirmation());
+        assertTrue(new DeleteRecipeTool(null).requiresConfirmation());
+        assertFalse(new AddRecipeTool(null).requiresConfirmation());
+        assertFalse(new ListRecipesTool(null).requiresConfirmation());
         assertFalse(new AddItemTool(null).requiresConfirmation());
         assertFalse(new RemoveItemTool(null).requiresConfirmation());
         assertFalse(new UpdateItemTool(null).requiresConfirmation());

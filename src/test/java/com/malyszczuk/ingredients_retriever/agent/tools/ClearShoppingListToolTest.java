@@ -32,4 +32,9 @@ class ClearShoppingListToolTest {
         verify(shoppingListService).clearItems();
         assertEquals(Map.of("cleared", true), result);
     }
+
+    @Test
+    void confirmationDescription_saysWhatWouldBeCleared() {
+        assertEquals("Remove every item from the shopping list", clearShoppingListTool.confirmationDescription(Map.of()));
+    }
 }
