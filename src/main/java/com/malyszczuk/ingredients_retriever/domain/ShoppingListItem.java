@@ -30,10 +30,12 @@ public class ShoppingListItem {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    // Uniqueness (ignoring case) is enforced by a database index, see db/migration/V1__create_schema.sql.
+    @Column(nullable = false)
     private String name;
 
     @Builder.Default
+    @Column(precision = 12, scale = 3)
     private BigDecimal quantity = BigDecimal.ZERO;
 
     private String unit;

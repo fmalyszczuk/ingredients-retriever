@@ -36,6 +36,7 @@ public class Ingredient {
     @Column(nullable = false)
     private String name;
 
+    @Column(precision = 12, scale = 3)
     private BigDecimal quantity;
 
     private String unit;
