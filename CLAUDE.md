@@ -24,5 +24,9 @@ ingredients across recipes.
 - GET  /shopping-list
 
 ## Conventions
+- Security: the server must never fetch a user-supplied URL directly. Anything that takes a URL from a user, a
+  recipe page or the LLM goes through net.SafePageFetcher / net.UrlGuard (SSRF protection: http(s) on ports 80/443
+  only, public addresses only, DNS pinned to the checked addresses, redirects validated hop by hop, size/time limits).
+  Never use Jsoup.connect(url), RestClient or HttpClient on such a URL.
 - Tests: JUnit 5 + Mockito, MockMvc for controllers
 - No paid APIs — Ollama only, or free tiers (Tavily/Brave for search)
