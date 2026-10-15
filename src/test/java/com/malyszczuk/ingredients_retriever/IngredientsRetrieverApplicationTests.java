@@ -1,10 +1,11 @@
 package com.malyszczuk.ingredients_retriever;
 
+import com.malyszczuk.ingredients_retriever.support.PostgresIntegrationTest;
+import com.malyszczuk.ingredients_retriever.support.RequiresDocker;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class IngredientsRetrieverApplicationTests {
+@RequiresDocker
+class IngredientsRetrieverApplicationTests extends PostgresIntegrationTest {
 
 	@Test
 	void contextLoads() {
