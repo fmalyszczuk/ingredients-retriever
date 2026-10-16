@@ -1,6 +1,7 @@
 package com.malyszczuk.ingredients_retriever.controller;
 
 import com.malyszczuk.ingredients_retriever.auth.AccountService;
+import com.malyszczuk.ingredients_retriever.auth.AccountRecoveryService;
 import com.malyszczuk.ingredients_retriever.auth.AppUserPrincipal;
 import com.malyszczuk.ingredients_retriever.auth.AuthThrottle;
 import com.malyszczuk.ingredients_retriever.auth.InvalidCredentialsException;
@@ -11,8 +12,11 @@ import com.malyszczuk.ingredients_retriever.auth.UserSessions;
 import com.malyszczuk.ingredients_retriever.auth.WrongPasswordException;
 import com.malyszczuk.ingredients_retriever.dto.ChangePasswordRequest;
 import com.malyszczuk.ingredients_retriever.dto.DeleteAccountRequest;
+import com.malyszczuk.ingredients_retriever.dto.EmailRequest;
 import com.malyszczuk.ingredients_retriever.dto.LoginRequest;
 import com.malyszczuk.ingredients_retriever.dto.RegisterRequest;
+import com.malyszczuk.ingredients_retriever.dto.ResetPasswordRequest;
+import com.malyszczuk.ingredients_retriever.dto.TokenRequest;
 import com.malyszczuk.ingredients_retriever.dto.UserResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -43,6 +47,7 @@ public class AuthController {
     private final LoginService loginService;
     private final AuthThrottle authThrottle;
     private final UserSessions userSessions;
+    private final AccountRecoveryService recoveryService;
 
     // What logging out does, for when the account is deleted: the session is destroyed and the cookies expire.
     private final LogoutHandler logoutHandler = new CompositeLogoutHandler(new SecurityContextLogoutHandler(),
@@ -77,6 +82,36 @@ public class AuthController {
     @GetMapping("/me")
     public UserResponse me(@AuthenticationPrincipal AppUserPrincipal user) {
         return new UserResponse(user.getId(), user.getEmail());
+    }
+
+    /** Opens the link from the verification email. The frontend's page for that link posts its token here. */
+    @PostMapping("/verify-email")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void verifyEmail(@Valid @RequestBody TokenRequest request) {
+        recoveryService.verifyEmail(request.token());
+    }
+
+    /** Sends the verification link again. Answers 204 whether or not the address has an account that needs one. */
+    @PostMapping("/resend-verification")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resendVerification(@Valid @RequestBody EmailRequest request, HttpServletRequest httpRequest) {
+        authThrottle.mailRequest(httpRequest.getRemoteAddr(), AccountService.normalizeEmail(request.email()));
+        recoveryService.resendVerification(request.email());
+    }
+
+    /** Emails a password reset link. Answers 204 whether or not the address has an account. */
+    @PostMapping("/forgot-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void forgotPassword(@Valid @RequestBody EmailRequest request, HttpServletRequest httpRequest) {
+        authThrottle.mailRequest(httpRequest.getRemoteAddr(), AccountService.normalizeEmail(request.email()));
+        recoveryService.forgotPassword(request.email());
+    }
+
+    /** Sets a new password with the token from the reset link. Logs the account out everywhere; it does not log anyone in. */
+    @PostMapping("/reset-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        recoveryService.resetPassword(request.token(), request.newPassword());
     }
 
     /**

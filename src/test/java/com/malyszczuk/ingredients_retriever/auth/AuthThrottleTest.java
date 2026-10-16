@@ -46,7 +46,7 @@ class AuthThrottleTest {
     void setUp() {
         clock = new TestClock();
         // 3 per address+account, 6 per address, 5 per account, within 15 minutes; 2 sign-ups per hour
-        throttle = new AuthThrottle(3, 6, 5, Duration.ofMinutes(15), 2, Duration.ofHours(1), clock);
+        throttle = new AuthThrottle(3, 6, 5, Duration.ofMinutes(15), 2, Duration.ofHours(1), 4, 2, Duration.ofHours(1), clock);
     }
 
     private void fail(String address, String account, int times) {
@@ -159,6 +159,25 @@ class AuthThrottleTest {
 
         clock.advance(Duration.ofHours(1));
         assertDoesNotThrow(() -> throttle.registrationAttempt("1.1.1.1"));
+    }
+
+    @Test
+    void mailRequests_areLimitedPerAccount_andPerAddress_whetherOrNotTheAccountExists() {
+        throttle.mailRequest("1.1.1.1", "a@x.com");
+        throttle.mailRequest("2.2.2.2", "a@x.com");
+
+        assertThrows(TooManyAttemptsException.class, () -> throttle.mailRequest("3.3.3.3", "a@x.com"), "2 per account");
+        assertDoesNotThrow(() -> throttle.mailRequest("3.3.3.3", "b@x.com"));
+
+        for (int i = 0; i < 2; i++) {
+            throttle.mailRequest("9.9.9.9", "c" + i + "@x.com");
+        }
+        throttle.mailRequest("9.9.9.9", "c2@x.com");
+        throttle.mailRequest("9.9.9.9", "c3@x.com");
+        assertThrows(TooManyAttemptsException.class, () -> throttle.mailRequest("9.9.9.9", "c4@x.com"), "4 per address");
+
+        clock.advance(Duration.ofHours(1));
+        assertDoesNotThrow(() -> throttle.mailRequest("9.9.9.9", "a@x.com"));
     }
 
     @Test

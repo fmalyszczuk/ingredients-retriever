@@ -28,6 +28,10 @@ ingredients across recipes.
   `permitAll()` for anything except the /auth entry points without an explicit decision, and every new
   endpoint must be covered by SecurityIntegrationTest's endpoint list. Auth is a cookie session + CSRF token
   (X-XSRF-TOKEN), sessions stored in PostgreSQL (Flyway V3, Spring Session JDBC); passwords are BCrypt-hashed, never logged or returned; login failures must all look the same.
+- Email flows (verify, reset): tokens are single-use, hashed in the database and sent only through
+  `mail.AccountMailService` (after commit, background thread, links from `pantrypal.public-url` never from the request).
+  "Send me a link" endpoints answer 204 whatever the address, and share the AuthThrottle mail limits. Tests catch mail
+  with a `@Primary Mailer`; pom's surefire config switches verification off for the other tests.
 - Sensitive account actions (change password, delete account) re-ask for the password, go through the same throttle as
   login, and answer a wrong password with 400, never 401. Deleting an account relies on ON DELETE CASCADE for user data
   and publishes AccountDeletedEvent (sessions, chats): new user-owned in-memory state must listen for it.

@@ -1,5 +1,6 @@
 package com.malyszczuk.ingredients_retriever.controller;
 
+import com.malyszczuk.ingredients_retriever.auth.AccountRecoveryService;
 import com.malyszczuk.ingredients_retriever.auth.AccountService;
 import com.malyszczuk.ingredients_retriever.auth.AuthThrottle;
 import com.malyszczuk.ingredients_retriever.auth.EmailAlreadyRegisteredException;
@@ -45,6 +46,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private UserSessions userSessions;
+
+    @MockitoBean
+    private AccountRecoveryService recoveryService;
 
     private String register(String email, String password) throws Exception {
         return mockMvc.perform(post("/auth/register")

@@ -22,12 +22,14 @@ public class AppUserPrincipal implements UserDetails, CredentialsContainer {
     private final Long id;
     private final String email;
     private final boolean enabled;
+    private final boolean emailVerified;
     private String passwordHash;
 
     public AppUserPrincipal(AppUser user) {
         this.id = user.getId();
         this.email = user.getEmail();
         this.enabled = user.isEnabled();
+        this.emailVerified = user.isEmailVerified();
         this.passwordHash = user.getPasswordHash();
     }
 
@@ -52,6 +54,10 @@ public class AppUserPrincipal implements UserDetails, CredentialsContainer {
     @Override
     public String getUsername() {
         return email;
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerified;
     }
 
     @Override

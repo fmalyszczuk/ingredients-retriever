@@ -92,6 +92,10 @@ running (without it they are skipped).
 | `POST` | `/auth/login` | Log in, sets the session cookie — *open* |
 | `GET` | `/auth/csrf` | Get the CSRF token cookie — *open* |
 | `GET` | `/auth/me` | Who is logged in (401 if nobody) |
+| `POST` | `/auth/verify-email` | Confirm an email address with the emailed token — *open* |
+| `POST` | `/auth/resend-verification` | Email the verification link again — *open* |
+| `POST` | `/auth/forgot-password` | Email a password reset link — *open* |
+| `POST` | `/auth/reset-password` | Set a new password with the emailed token — *open* |
 | `POST` | `/auth/logout` | Log out |
 | `POST` | `/auth/password` | Change the password (needs the current one); ends the user's other sessions |
 | `POST` | `/auth/delete-account` | Delete the account and all its data (needs the password) |

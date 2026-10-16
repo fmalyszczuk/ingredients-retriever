@@ -1,6 +1,7 @@
 package com.malyszczuk.ingredients_retriever.auth;
 
 import com.malyszczuk.ingredients_retriever.domain.AppUser;
+import com.malyszczuk.ingredients_retriever.domain.TokenType;
 import com.malyszczuk.ingredients_retriever.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -36,11 +38,17 @@ class AccountServiceTest {
     @Mock
     private ApplicationEventPublisher events;
 
+    @Mock
+    private AccountRecoveryService recovery;
+
+    @Mock
+    private AccountTokens tokens;
+
     private AccountService accountService;
 
     @BeforeEach
     void setUp() {
-        accountService = new AccountService(userRepository, passwordEncoder, new PasswordPolicy(), events);
+        accountService = new AccountService(userRepository, passwordEncoder, new PasswordPolicy(), events, recovery, tokens);
     }
 
     @Test
@@ -56,6 +64,27 @@ class AccountServiceTest {
         assertEquals("me@example.com", saved.getValue().getEmail());
         assertEquals("{bcrypt}$2a$12$hash", saved.getValue().getPasswordHash());
         assertNotEquals("a decent passphrase", saved.getValue().getPasswordHash());
+    }
+
+    @Test
+    void register_createsAnUnverifiedAccount_andSendsTheVerificationLink() {
+        when(userRepository.findByEmail("me@example.com")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("a decent passphrase")).thenReturn("{bcrypt}hash");
+        when(userRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AppUser created = accountService.register("me@example.com", "a decent passphrase");
+
+        assertFalse(created.isEmailVerified());
+        verify(recovery).sendVerification(created);
+    }
+
+    @Test
+    void register_sendsNoEmail_whenTheAddressIsTaken() {
+        when(userRepository.findByEmail("me@example.com")).thenReturn(Optional.of(AppUser.builder().email("me@example.com").build()));
+
+        assertThrows(EmailAlreadyRegisteredException.class, () -> accountService.register("me@example.com", "a decent passphrase"));
+
+        verifyNoInteractions(recovery);
     }
 
     @Test
@@ -109,6 +138,7 @@ class AccountServiceTest {
 
         assertEquals("{bcrypt}new", user.getPasswordHash());
         verify(userRepository).save(user);
+        verify(tokens).invalidateAll(5L, TokenType.RESET_PASSWORD);
     }
 
     @Test

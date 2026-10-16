@@ -31,6 +31,8 @@ public class AuthThrottle {
     private final AttemptLimiter perAddress;
     private final AttemptLimiter perAccount;
     private final AttemptLimiter registrations;
+    private final AttemptLimiter mailPerAddress;
+    private final AttemptLimiter mailPerAccount;
 
     @Autowired
     public AuthThrottle(
@@ -39,18 +41,24 @@ public class AuthThrottle {
             @Value("${pantrypal.security.throttle.login-failures-per-account:20}") int perAccountMax,
             @Value("${pantrypal.security.throttle.login-window:15m}") Duration loginWindow,
             @Value("${pantrypal.security.throttle.registrations-per-address:10}") int registrationsMax,
-            @Value("${pantrypal.security.throttle.registration-window:1h}") Duration registrationWindow) {
+            @Value("${pantrypal.security.throttle.registration-window:1h}") Duration registrationWindow,
+            @Value("${pantrypal.security.throttle.mail-requests-per-address:10}") int mailPerAddressMax,
+            @Value("${pantrypal.security.throttle.mail-requests-per-account:3}") int mailPerAccountMax,
+            @Value("${pantrypal.security.throttle.mail-window:1h}") Duration mailWindow) {
         this(perAddressAndAccountMax, perAddressMax, perAccountMax, loginWindow, registrationsMax, registrationWindow,
-                Clock.systemUTC());
+                mailPerAddressMax, mailPerAccountMax, mailWindow, Clock.systemUTC());
     }
 
     AuthThrottle(int perAddressAndAccountMax, int perAddressMax, int perAccountMax, Duration loginWindow,
-                 int registrationsMax, Duration registrationWindow, Clock clock) {
+                 int registrationsMax, Duration registrationWindow,
+                 int mailPerAddressMax, int mailPerAccountMax, Duration mailWindow, Clock clock) {
         int maxKeys = 50_000;
         this.perAddressAndAccount = new AttemptLimiter(perAddressAndAccountMax, loginWindow, maxKeys, clock);
         this.perAddress = new AttemptLimiter(perAddressMax, loginWindow, maxKeys, clock);
         this.perAccount = new AttemptLimiter(perAccountMax, loginWindow, maxKeys, clock);
         this.registrations = new AttemptLimiter(registrationsMax, registrationWindow, maxKeys, clock);
+        this.mailPerAddress = new AttemptLimiter(mailPerAddressMax, mailWindow, maxKeys, clock);
+        this.mailPerAccount = new AttemptLimiter(mailPerAccountMax, mailWindow, maxKeys, clock);
     }
 
     /** Throws if this address may not try to log in to this account right now. {@code account} must be normalized. */
@@ -83,6 +91,22 @@ public class AuthThrottle {
             throw new TooManyAttemptsException(wait);
         });
         registrations.record(address);
+    }
+
+    /**
+     * Counts a request that makes the application send an email ("resend the verification", "forgot my password") and
+     * throws if there have been too many from this address, or for this account. Every request counts, whether or not
+     * the account exists, so being blocked tells nothing about the account. {@code account} must be normalized.
+     */
+    public void mailRequest(String address, String account) {
+        Optional<Duration> longest = Stream.of(mailPerAddress.blockedFor(address), mailPerAccount.blockedFor(account))
+                .flatMap(Optional::stream)
+                .max(Duration::compareTo);
+        if (longest.isPresent()) {
+            throw new TooManyAttemptsException(longest.get());
+        }
+        mailPerAddress.record(address);
+        mailPerAccount.record(account);
     }
 
     private static String pair(String address, String account) {

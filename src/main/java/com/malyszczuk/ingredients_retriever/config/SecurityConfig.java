@@ -47,7 +47,8 @@ public class SecurityConfig {
                                                    SecurityContextRepository securityContextRepository) throws Exception {
         http
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(HttpMethod.POST, "/auth/register", "/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/register", "/auth/login", "/auth/verify-email",
+                                "/auth/resend-verification", "/auth/forgot-password", "/auth/reset-password").permitAll()
                         .requestMatchers(HttpMethod.GET, "/auth/csrf").permitAll()
                         .anyRequest().authenticated())
                 // Cookie-based CSRF tokens in the form single-page apps expect: the frontend reads the XSRF-TOKEN cookie

@@ -1,6 +1,7 @@
 package com.malyszczuk.ingredients_retriever.exception;
 
 import com.malyszczuk.ingredients_retriever.auth.EmailAlreadyRegisteredException;
+import com.malyszczuk.ingredients_retriever.auth.EmailNotVerifiedException;
 import com.malyszczuk.ingredients_retriever.auth.InvalidCredentialsException;
 import com.malyszczuk.ingredients_retriever.auth.TooManyAttemptsException;
 import com.malyszczuk.ingredients_retriever.auth.WrongPasswordException;
@@ -44,6 +45,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<String> handleInvalidCredentials(InvalidCredentialsException exception) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(exception.getMessage());
+    }
+
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    public ResponseEntity<String> handleEmailNotVerified(EmailNotVerifiedException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(exception.getMessage());
     }
 
     @ExceptionHandler(WrongPasswordException.class)

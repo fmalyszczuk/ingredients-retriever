@@ -45,4 +45,8 @@ public class AppUser {
 
     @Builder.Default
     private boolean enabled = true;
+
+    /** Whether the owner has opened the link emailed to this address. Accounts that predate verification count as verified. */
+    @Builder.Default
+    private boolean emailVerified = false;
 }

@@ -55,4 +55,17 @@ class OwnershipMigrationIntegrationTest {
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM shopping_list_items", Integer.class));
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM recipes", Integer.class));
     }
+
+    @Test
+    void accountsThatExistedBeforeEmailVerification_countAsVerified_soNobodyIsLockedOut() {
+        JdbcTemplate jdbc = freshDatabaseAt("migration_verification", "4");
+        jdbc.update("INSERT INTO users (email, password_hash, created_at) VALUES ('old@example.com', 'x', now())");
+
+        migrateToLatest(jdbc);
+
+        assertEquals(Boolean.TRUE, jdbc.queryForObject("SELECT email_verified FROM users WHERE email = 'old@example.com'", Boolean.class));
+        jdbc.update("INSERT INTO users (email, password_hash, created_at) VALUES ('new@example.com', 'x', now())");
+        assertEquals(Boolean.FALSE, jdbc.queryForObject("SELECT email_verified FROM users WHERE email = 'new@example.com'", Boolean.class),
+                "accounts created from now on start unverified");
+    }
 }
