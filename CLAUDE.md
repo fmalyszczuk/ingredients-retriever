@@ -31,5 +31,8 @@ ingredients across recipes.
 - Database: the schema is owned by Flyway (src/main/resources/db/migration). Hibernate is `ddl-auto=validate`
   only. Never edit an applied migration; add a new V<n>__*.sql. Entities must match the migration.
 - DB tests use a real PostgreSQL via Testcontainers (skipped when Docker is unavailable).
+- Database: the schema is owned by Flyway (src/main/resources/db/migration). Hibernate is `ddl-auto=validate`
+  only. Never edit an applied migration; add a new V<n>__*.sql. Entities must match the migration.
+- DB tests use a real PostgreSQL via Testcontainers (skipped when Docker is unavailable).
 - Tests: JUnit 5 + Mockito, MockMvc for controllers
 - No paid APIs — Ollama only, or free tiers (Tavily/Brave for search)
