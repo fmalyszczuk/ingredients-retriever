@@ -28,6 +28,10 @@ ingredients across recipes.
   `permitAll()` for anything except the /auth entry points without an explicit decision, and every new
   endpoint must be covered by SecurityIntegrationTest's endpoint list. Auth is a cookie session + CSRF token
   (X-XSRF-TOKEN), sessions stored in PostgreSQL (Flyway V3, Spring Session JDBC); passwords are BCrypt-hashed, never logged or returned; login failures must all look the same.
+- Data ownership: recipes and shopping list items belong to a user (user_id, migration V4). Every repository query is
+  scoped by the owner via `CurrentUser.id()`; never fetch by id alone or `findAll()`. Someone else's row looks like a
+  missing one (404). Chat conversation ids are namespaced by user. New user-owned data needs a user_id column and a
+  case in DataOwnershipIntegrationTest.
 - Security: the server must never fetch a user-supplied URL directly. Anything that takes a URL from a user, a
   recipe page or the LLM goes through net.SafePageFetcher / net.UrlGuard (SSRF protection: http(s) on ports 80/443
   only, public addresses only, DNS pinned to the checked addresses, redirects validated hop by hop, size/time limits).

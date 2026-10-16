@@ -1,6 +1,7 @@
 package com.malyszczuk.ingredients_retriever.agent;
 
 import com.malyszczuk.ingredients_retriever.agent.tools.AgentTool;
+import com.malyszczuk.ingredients_retriever.auth.CurrentUser;
 import com.malyszczuk.ingredients_retriever.dto.ChatAction;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,17 +34,21 @@ class ChatAgentServiceTest {
     @Mock
     private AgentTool addItemTool;
 
+    @Mock
+    private CurrentUser currentUser;
+
     private ChatAgentService chatAgentService;
     private ConversationStore conversationStore;
 
     @BeforeEach
     void setUp() {
+        lenient().when(currentUser.id()).thenReturn(7L);
         lenient().when(addItemTool.name()).thenReturn("add_item");
         lenient().when(addItemTool.description()).thenReturn("Adds an item");
         lenient().when(addItemTool.parameterSchema()).thenReturn(Map.of("type", "object"));
 
         conversationStore = new ConversationStore();
-        chatAgentService = new ChatAgentService(ollamaChatClient, List.of(addItemTool), new ObjectMapper(), conversationStore);
+        chatAgentService = new ChatAgentService(ollamaChatClient, List.of(addItemTool), new ObjectMapper(), conversationStore, currentUser);
     }
 
     @Test
@@ -127,6 +132,27 @@ class ChatAgentServiceTest {
     }
 
     @Test
+    void conversations_belongToTheirUser_soTheSameIdFromAnotherUserIsADifferentConversation() {
+        when(ollamaChatClient.chat(any(), any()))
+                .thenReturn(new OllamaChatResponse("llama3.2", "now", new OllamaMessage("assistant", "ok", null), true));
+        chatAgentService.chat("shared-id", "my secret message");
+
+        when(currentUser.id()).thenReturn(8L);
+        chatAgentService.chat("shared-id", "hello");
+
+        org.mockito.ArgumentCaptor<List<OllamaMessage>> sent = org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(ollamaChatClient, times(2)).chat(sent.capture(), any());
+        assertTrue(sent.getAllValues().get(1).stream().noneMatch(m -> "my secret message".equals(m.content())),
+                "the second user must not see the first user's messages");
+        assertEquals(2, conversationStore.history("7:shared-id").size());
+        assertEquals(2, conversationStore.history("8:shared-id").size());
+
+        chatAgentService.forgetConversation("shared-id"); // as user 8: must not touch user 7's
+        assertEquals(2, conversationStore.history("7:shared-id").size());
+        assertTrue(conversationStore.history("8:shared-id").isEmpty());
+    }
+
+    @Test
     void chat_storesOnlyUserAndFinalReply_notToolTraffic() {
         OllamaToolCall toolCall = new OllamaToolCall(new OllamaToolCallFunction("add_item", Map.of("name", "eggs")));
         when(ollamaChatClient.chat(any(), any()))
@@ -136,7 +162,7 @@ class ChatAgentServiceTest {
 
         chatAgentService.chat("c1", "add eggs");
 
-        List<OllamaMessage> stored = conversationStore.history("c1");
+        List<OllamaMessage> stored = conversationStore.history("7:c1");
         assertEquals(List.of("user", "assistant"), stored.stream().map(OllamaMessage::role).toList());
         assertEquals("Added eggs.", stored.get(1).content());
     }
@@ -151,7 +177,7 @@ class ChatAgentServiceTest {
         ChatResult result = chatAgentService.chat("c1", "add eggs forever");
 
         assertTrue(result.incomplete());
-        assertTrue(conversationStore.history("c1").isEmpty());
+        assertTrue(conversationStore.history("7:c1").isEmpty());
     }
 
     @Test
@@ -162,7 +188,7 @@ class ChatAgentServiceTest {
 
         chatAgentService.forgetConversation("c1");
 
-        assertTrue(conversationStore.history("c1").isEmpty());
+        assertTrue(conversationStore.history("7:c1").isEmpty());
     }
 
     @Test
@@ -207,7 +233,7 @@ class ChatAgentServiceTest {
     }
 
     private ChatAgentService serviceWith(AgentTool... tools) {
-        return new ChatAgentService(ollamaChatClient, List.of(tools), new ObjectMapper(), conversationStore);
+        return new ChatAgentService(ollamaChatClient, List.of(tools), new ObjectMapper(), conversationStore, currentUser);
     }
 
     @Test
@@ -430,7 +456,7 @@ class ChatAgentServiceTest {
         ChatResult gaveUp = service.chat("c1", "clear my list");
 
         assertTrue(gaveUp.incomplete());
-        assertTrue(conversationStore.takePendingConfirmations("c1").isEmpty());
+        assertTrue(conversationStore.takePendingConfirmations("7:c1").isEmpty());
         verify(clear, never()).execute(any());
     }
 
@@ -446,7 +472,7 @@ class ChatAgentServiceTest {
         when(ollamaChatClient.chat(any(), any())).thenReturn(new OllamaChatResponse("llama3.2", "now", null, true));
 
         assertThrows(OllamaResponseException.class, () -> chatAgentService.chat("c1", "hi"));
-        assertTrue(conversationStore.history("c1").isEmpty());
+        assertTrue(conversationStore.history("7:c1").isEmpty());
     }
 
     @Test

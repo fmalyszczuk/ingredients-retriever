@@ -30,7 +30,11 @@ public class ShoppingListItem {
     @EqualsAndHashCode.Include
     private Long id;
 
-    // Uniqueness (ignoring case) is enforced by a database index, see db/migration/V1__create_schema.sql.
+    /** The owner. Every query is scoped by it, see ShoppingListItemRepository. */
+    @Column(nullable = false, updatable = false)
+    private Long userId;
+
+    // Uniqueness (per user, ignoring case) is enforced by a database index, see db/migration/V4__own_data_per_user.sql.
     @Column(nullable = false)
     private String name;
 

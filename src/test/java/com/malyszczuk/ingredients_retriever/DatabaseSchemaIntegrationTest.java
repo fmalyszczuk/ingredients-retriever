@@ -8,6 +8,7 @@ import com.malyszczuk.ingredients_retriever.repository.RecipeRepository;
 import com.malyszczuk.ingredients_retriever.repository.ShoppingListItemRepository;
 import com.malyszczuk.ingredients_retriever.support.PostgresIntegrationTest;
 import com.malyszczuk.ingredients_retriever.support.RequiresDocker;
+import com.malyszczuk.ingredients_retriever.support.TestUsers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,11 +40,15 @@ class DatabaseSchemaIntegrationTest extends PostgresIntegrationTest {
     @Autowired
     private TransactionTemplate transactionTemplate;
 
+    private Long userId;
+
     @BeforeEach
     void emptyTables() {
         jdbc.update("DELETE FROM ingredients");
         jdbc.update("DELETE FROM recipes");
         jdbc.update("DELETE FROM shopping_list_items");
+        jdbc.update("DELETE FROM users");
+        userId = TestUsers.create(jdbc, "schema@example.com").getId();
     }
 
     @Test
@@ -58,21 +63,21 @@ class DatabaseSchemaIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void shoppingListItemNames_areUniqueIgnoringCase_enforcedByTheDatabase() {
-        shoppingListItemRepository.saveAndFlush(ShoppingListItem.builder().name("Eggs").build());
+        shoppingListItemRepository.saveAndFlush(ShoppingListItem.builder().userId(userId).name("Eggs").build());
 
         assertThrows(DataIntegrityViolationException.class,
-                () -> shoppingListItemRepository.saveAndFlush(ShoppingListItem.builder().name("eggs").build()));
+                () -> shoppingListItemRepository.saveAndFlush(ShoppingListItem.builder().userId(userId).name("eggs").build()));
         assertThrows(DataIntegrityViolationException.class,
-                () -> jdbc.update("INSERT INTO shopping_list_items (name, purchased) VALUES ('EGGS', false)"));
+                () -> jdbc.update("INSERT INTO shopping_list_items (user_id, name, purchased) VALUES (?, 'EGGS', false)", userId));
     }
 
     @Test
     void caseInsensitiveLookup_findsTheItemWhateverTheCase() {
-        shoppingListItemRepository.saveAndFlush(ShoppingListItem.builder().name("Eggs").build());
+        shoppingListItemRepository.saveAndFlush(ShoppingListItem.builder().userId(userId).name("Eggs").build());
 
         List<String> found = transactionTemplate.execute(status -> List.of(
-                shoppingListItemRepository.findByNameIgnoreCase("eggs").orElseThrow().getName(),
-                shoppingListItemRepository.findByNameIgnoreCase("EGGS").orElseThrow().getName()));
+                shoppingListItemRepository.findByUserIdAndNameIgnoreCase(userId, "eggs").orElseThrow().getName(),
+                shoppingListItemRepository.findByUserIdAndNameIgnoreCase(userId, "EGGS").orElseThrow().getName()));
 
         assertEquals(List.of("Eggs", "Eggs"), found);
     }
@@ -81,7 +86,7 @@ class DatabaseSchemaIntegrationTest extends PostgresIntegrationTest {
     void quantities_keepThreeDecimals() {
         // H2's default silently rounded to two (8.763 became 8.76); the unit converter works to three.
         Long id = shoppingListItemRepository.saveAndFlush(
-                ShoppingListItem.builder().name("milk").quantity(new BigDecimal("8.763")).unit("tbsp").build()).getId();
+                ShoppingListItem.builder().userId(userId).name("milk").quantity(new BigDecimal("8.763")).unit("tbsp").build()).getId();
 
         BigDecimal stored = jdbc.queryForObject("SELECT quantity FROM shopping_list_items WHERE id = ?", BigDecimal.class, id);
 
@@ -91,13 +96,13 @@ class DatabaseSchemaIntegrationTest extends PostgresIntegrationTest {
     @Test
     void recipeWithIngredients_roundTrips_andLongSourceReferencesFit() {
         String longUrl = "https://example.com/recipes/" + "a".repeat(1500);
-        Recipe recipe = Recipe.builder().title("Pancakes").sourceType(RecipeSource.URL).sourceReference(longUrl).build();
+        Recipe recipe = Recipe.builder().userId(userId).title("Pancakes").sourceType(RecipeSource.URL).sourceReference(longUrl).build();
         recipe.addIngredient(Ingredient.builder().name("flour").quantity(new BigDecimal("1.500")).unit("cups").build());
         recipe.addIngredient(Ingredient.builder().name("salt").build());
         Long id = recipeRepository.saveAndFlush(recipe).getId();
 
         Recipe loaded = transactionTemplate.execute(status -> {
-            Recipe found = recipeRepository.findById(id).orElseThrow();
+            Recipe found = recipeRepository.findByIdAndUserId(id, userId).orElseThrow();
             found.getIngredients().size();
             return found;
         });
@@ -111,7 +116,7 @@ class DatabaseSchemaIntegrationTest extends PostgresIntegrationTest {
     @Test
     void sourceType_isRestrictedToKnownValues_bytheDatabase() {
         assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(
-                "INSERT INTO recipes (title, source_type, created_at) VALUES ('x', 'BOGUS', now())"));
+                "INSERT INTO recipes (user_id, title, source_type, created_at) VALUES (?, 'x', 'BOGUS', now())", userId));
     }
 
     @Test
@@ -123,7 +128,7 @@ class DatabaseSchemaIntegrationTest extends PostgresIntegrationTest {
     @Test
     void deletingARecipe_removesItsIngredients_evenWhenTheApplicationIsNotInvolved() {
         Long recipeId = jdbc.queryForObject(
-                "INSERT INTO recipes (title, source_type, created_at) VALUES ('x', 'MANUAL', now()) RETURNING id", Long.class);
+                "INSERT INTO recipes (user_id, title, source_type, created_at) VALUES (?, 'x', 'MANUAL', now()) RETURNING id", Long.class, userId);
         jdbc.update("INSERT INTO ingredients (name, recipe_id) VALUES ('a', ?), ('b', ?)", recipeId, recipeId);
 
         jdbc.update("DELETE FROM recipes WHERE id = ?", recipeId);

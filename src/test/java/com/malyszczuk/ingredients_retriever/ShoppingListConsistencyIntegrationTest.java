@@ -7,11 +7,15 @@ import com.malyszczuk.ingredients_retriever.service.RecipeService;
 import com.malyszczuk.ingredients_retriever.service.ShoppingListService;
 import com.malyszczuk.ingredients_retriever.support.PostgresIntegrationTest;
 import com.malyszczuk.ingredients_retriever.support.RequiresDocker;
+import com.malyszczuk.ingredients_retriever.support.TestUsers;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -45,6 +49,13 @@ class ShoppingListConsistencyIntegrationTest extends PostgresIntegrationTest {
         jdbc.update("DELETE FROM ingredients");
         jdbc.update("DELETE FROM recipes");
         jdbc.update("DELETE FROM shopping_list_items");
+        jdbc.update("DELETE FROM users");
+        TestUsers.actAs(TestUsers.create(jdbc, "consistency@example.com"));
+    }
+
+    @AfterEach
+    void logOut() {
+        TestUsers.nobody();
     }
 
     private BigDecimal quantityOf(String name) {
@@ -57,12 +68,14 @@ class ShoppingListConsistencyIntegrationTest extends PostgresIntegrationTest {
 
     /** Runs the tasks at the same moment, from separate threads, and returns what each one ended with. */
     private <T> List<Object> runConcurrently(List<Callable<T>> tasks) throws Exception {
+        SecurityContext loggedIn = SecurityContextHolder.getContext();
         ExecutorService pool = Executors.newFixedThreadPool(tasks.size());
         CountDownLatch go = new CountDownLatch(1);
         try {
             List<Future<T>> futures = new ArrayList<>();
             for (Callable<T> task : tasks) {
                 futures.add(pool.submit(() -> {
+                    SecurityContextHolder.setContext(loggedIn); // the worker threads act as the same user
                     go.await();
                     return task.call();
                 }));

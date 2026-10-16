@@ -1,5 +1,6 @@
 package com.malyszczuk.ingredients_retriever.service;
 
+import com.malyszczuk.ingredients_retriever.auth.CurrentUser;
 import com.malyszczuk.ingredients_retriever.domain.Ingredient;
 import com.malyszczuk.ingredients_retriever.domain.Recipe;
 import com.malyszczuk.ingredients_retriever.domain.RecipeSource;
@@ -24,6 +25,7 @@ import java.util.NoSuchElementException;
 public class RecipeService {
 
     private final RecipeRepository recipeRepository;
+    private final CurrentUser currentUser;
     private final ShoppingListService shoppingListService;
     private final RecipeUrlScraper recipeUrlScraper;
     private final IngredientLineParser ingredientLineParser;
@@ -32,12 +34,12 @@ public class RecipeService {
 
     @Transactional(readOnly = true)
     public List<Recipe> listRecipes() {
-        return recipeRepository.findAll();
+        return recipeRepository.findAllByUserIdOrderById(currentUser.id());
     }
 
     @Transactional(readOnly = true)
     public Recipe getRecipe(Long id) {
-        return recipeRepository.findById(id)
+        return recipeRepository.findByIdAndUserId(id, currentUser.id())
                 .orElseThrow(() -> new NoSuchElementException("No recipe with id " + id));
     }
 
@@ -55,6 +57,7 @@ public class RecipeService {
     public Recipe addRecipe(String title, RecipeSource sourceType, String sourceReference,
                              List<IngredientRequest> ingredientRequests) {
         Recipe recipe = Recipe.builder()
+                .userId(currentUser.id())
                 .title(title)
                 .sourceType(sourceType)
                 .sourceReference(sourceReference)

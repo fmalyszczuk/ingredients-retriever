@@ -1,5 +1,6 @@
 package com.malyszczuk.ingredients_retriever.service;
 
+import com.malyszczuk.ingredients_retriever.auth.CurrentUser;
 import java.util.List;
 import com.malyszczuk.ingredients_retriever.domain.Ingredient;
 import com.malyszczuk.ingredients_retriever.domain.ShoppingListItem;
@@ -17,25 +18,32 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ShoppingListServiceTest {
 
+    private static final Long USER_ID = 7L;
+
     @Mock
     private ShoppingListItemRepository shoppingListItemRepository;
+
+    @Mock
+    private CurrentUser currentUser;
 
     private ShoppingListService shoppingListService;
 
     @BeforeEach
     void setUp() {
-        shoppingListService = new ShoppingListService(shoppingListItemRepository, new UnitConverter());
+        lenient().when(currentUser.id()).thenReturn(USER_ID);
+        shoppingListService = new ShoppingListService(shoppingListItemRepository, new UnitConverter(), currentUser);
     }
 
     @Test
     void addItem_createsNewEntry_whenNoneExists() {
-        when(shoppingListItemRepository.findByNameIgnoreCase("eggs")).thenReturn(Optional.empty());
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "eggs")).thenReturn(Optional.empty());
         when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListItem result = shoppingListService.addItem("eggs", BigDecimal.valueOf(2), "pcs");
@@ -52,7 +60,7 @@ class ShoppingListServiceTest {
                 .quantity(BigDecimal.valueOf(2))
                 .unit("pcs")
                 .build();
-        when(shoppingListItemRepository.findByNameIgnoreCase("eggs")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "eggs")).thenReturn(Optional.of(existing));
         when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListItem result = shoppingListService.addItem("eggs", BigDecimal.valueOf(3), "pcs");
@@ -66,7 +74,7 @@ class ShoppingListServiceTest {
                 .name("salt")
                 .quantity(null)
                 .build();
-        when(shoppingListItemRepository.findByNameIgnoreCase("salt")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "salt")).thenReturn(Optional.of(existing));
         when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListItem result = shoppingListService.addItem("salt", BigDecimal.valueOf(1), "tsp");
@@ -88,7 +96,7 @@ class ShoppingListServiceTest {
                 .unit("pcs")
                 .purchased(false)
                 .build();
-        when(shoppingListItemRepository.findByNameIgnoreCase("eggs")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "eggs")).thenReturn(Optional.of(existing));
         when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListItem result = shoppingListService.updateItem("eggs", true, null, null);
@@ -105,7 +113,7 @@ class ShoppingListServiceTest {
                 .quantity(BigDecimal.valueOf(200))
                 .unit("g")
                 .build();
-        when(shoppingListItemRepository.findByNameIgnoreCase("flour")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "flour")).thenReturn(Optional.of(existing));
         when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListItem result = shoppingListService.updateItem("flour", null, BigDecimal.valueOf(500), "kg");
@@ -121,7 +129,7 @@ class ShoppingListServiceTest {
                 .quantity(BigDecimal.valueOf(2))
                 .unit("lb")
                 .build();
-        when(shoppingListItemRepository.findByNameIgnoreCase("flour")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "flour")).thenReturn(Optional.of(existing));
         when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListItem result = shoppingListService.updateItem("flour", null, null, "kg");
@@ -137,7 +145,7 @@ class ShoppingListServiceTest {
                 .quantity(BigDecimal.valueOf(12))
                 .unit("pcs")
                 .build();
-        when(shoppingListItemRepository.findByNameIgnoreCase("eggs")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "eggs")).thenReturn(Optional.of(existing));
         when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListItem result = shoppingListService.updateItem("eggs", null, null, "box");
@@ -153,7 +161,7 @@ class ShoppingListServiceTest {
                 .quantity(BigDecimal.valueOf(2))
                 .unit("cup")
                 .build();
-        when(shoppingListItemRepository.findByNameIgnoreCase("milk")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "milk")).thenReturn(Optional.of(existing));
         when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListItem result = shoppingListService.updateItem("milk", null, null, "ml");
@@ -169,7 +177,7 @@ class ShoppingListServiceTest {
                 .quantity(BigDecimal.valueOf(2))
                 .unit("lb")
                 .build();
-        when(shoppingListItemRepository.findByNameIgnoreCase("flour")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "flour")).thenReturn(Optional.of(existing));
         when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListItem result = shoppingListService.updateItem("flour", null, null, "ml");
@@ -185,7 +193,7 @@ class ShoppingListServiceTest {
                 .quantity(BigDecimal.valueOf(1))
                 .unit(null)
                 .build();
-        when(shoppingListItemRepository.findByNameIgnoreCase("salt")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "salt")).thenReturn(Optional.of(existing));
         when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListItem result = shoppingListService.updateItem("salt", null, null, "kg");
@@ -196,7 +204,7 @@ class ShoppingListServiceTest {
 
     @Test
     void updateItem_throws_whenItemDoesNotExist() {
-        when(shoppingListItemRepository.findByNameIgnoreCase("eggs")).thenReturn(Optional.empty());
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "eggs")).thenReturn(Optional.empty());
 
         assertThrows(NoSuchElementException.class, () -> shoppingListService.updateItem("eggs", true, null, null));
     }
@@ -208,7 +216,7 @@ class ShoppingListServiceTest {
                 .quantity(BigDecimal.valueOf(2))
                 .unit("lb")
                 .build();
-        when(shoppingListItemRepository.findByNameIgnoreCase("flour")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "flour")).thenReturn(Optional.of(existing));
         when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListItem result = shoppingListService.convertItemUnit("flour", "kg");
@@ -219,7 +227,7 @@ class ShoppingListServiceTest {
 
     @Test
     void convertItemUnit_throws_whenItemDoesNotExist() {
-        when(shoppingListItemRepository.findByNameIgnoreCase("flour")).thenReturn(Optional.empty());
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "flour")).thenReturn(Optional.empty());
 
         assertThrows(NoSuchElementException.class, () -> shoppingListService.convertItemUnit("flour", "kg"));
     }
@@ -231,7 +239,7 @@ class ShoppingListServiceTest {
                 .quantity(BigDecimal.valueOf(2))
                 .unit("lb")
                 .build();
-        when(shoppingListItemRepository.findByNameIgnoreCase("flour")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "flour")).thenReturn(Optional.of(existing));
 
         assertThrows(IllegalArgumentException.class, () -> shoppingListService.convertItemUnit("flour", "ml"));
     }
@@ -239,7 +247,7 @@ class ShoppingListServiceTest {
     @Test
     void convertItemUnit_throws_whenItemHasNoExistingQuantityOrUnit() {
         ShoppingListItem existing = ShoppingListItem.builder().name("salt").quantity(null).unit(null).build();
-        when(shoppingListItemRepository.findByNameIgnoreCase("salt")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "salt")).thenReturn(Optional.of(existing));
 
         assertThrows(IllegalArgumentException.class, () -> shoppingListService.convertItemUnit("salt", "kg"));
     }
@@ -247,7 +255,7 @@ class ShoppingListServiceTest {
     @Test
     void removeItem_deletesEntry_whenPresent() {
         ShoppingListItem existing = ShoppingListItem.builder().name("eggs").build();
-        when(shoppingListItemRepository.findByNameIgnoreCase("eggs")).thenReturn(Optional.of(existing));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "eggs")).thenReturn(Optional.of(existing));
 
         shoppingListService.removeItem("eggs");
 
@@ -256,7 +264,7 @@ class ShoppingListServiceTest {
 
     @Test
     void removeItem_doesNothing_whenAbsent() {
-        when(shoppingListItemRepository.findByNameIgnoreCase("eggs")).thenReturn(Optional.empty());
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "eggs")).thenReturn(Optional.empty());
 
         shoppingListService.removeItem("eggs");
 
@@ -267,7 +275,7 @@ class ShoppingListServiceTest {
     void clearItems_deletesEveryEntry() {
         shoppingListService.clearItems();
 
-        verify(shoppingListItemRepository).deleteAll();
+        verify(shoppingListItemRepository).deleteAllByUserId(USER_ID);
     }
 
     private Ingredient ingredient(String name, String quantity, String unit) {
@@ -281,7 +289,7 @@ class ShoppingListServiceTest {
     @Test
     void removeIngredients_subtractsQuantity_whenUnitsMatch() {
         ShoppingListItem flour = listItem("flour", "500", "g");
-        when(shoppingListItemRepository.findByNameIgnoreCase("flour")).thenReturn(Optional.of(flour));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "flour")).thenReturn(Optional.of(flour));
 
         shoppingListService.removeIngredients(List.of(ingredient("flour", "200", "G")));
 
@@ -292,7 +300,7 @@ class ShoppingListServiceTest {
     @Test
     void removeIngredients_deletesItem_whenNothingIsLeft() {
         ShoppingListItem eggs = listItem("eggs", "2", "pcs");
-        when(shoppingListItemRepository.findByNameIgnoreCase("eggs")).thenReturn(Optional.of(eggs));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "eggs")).thenReturn(Optional.of(eggs));
 
         shoppingListService.removeIngredients(List.of(ingredient("eggs", "3", "pcs")));
 
@@ -303,7 +311,7 @@ class ShoppingListServiceTest {
     @Test
     void removeIngredients_convertsWithinSameUnitType() {
         ShoppingListItem flour = listItem("flour", "2", "kg");
-        when(shoppingListItemRepository.findByNameIgnoreCase("flour")).thenReturn(Optional.of(flour));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "flour")).thenReturn(Optional.of(flour));
 
         shoppingListService.removeIngredients(List.of(ingredient("flour", "500", "g")));
 
@@ -313,7 +321,7 @@ class ShoppingListServiceTest {
     @Test
     void removeIngredients_leavesItemAlone_whenUnitsAreIncompatible() {
         ShoppingListItem milk = listItem("milk", "1", "l");
-        when(shoppingListItemRepository.findByNameIgnoreCase("milk")).thenReturn(Optional.of(milk));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "milk")).thenReturn(Optional.of(milk));
 
         shoppingListService.removeIngredients(List.of(ingredient("milk", "200", "g")));
 
@@ -326,10 +334,10 @@ class ShoppingListServiceTest {
     void removeIngredients_leavesItemAlone_whenAQuantityIsUnspecified() {
         ShoppingListItem salt = listItem("salt", null, null);
         ShoppingListItem pepper = listItem("pepper", "5", "g");
-        when(shoppingListItemRepository.findByNameIgnoreCase("salt")).thenReturn(Optional.of(salt));
-        when(shoppingListItemRepository.findByNameIgnoreCase("pepper")).thenReturn(Optional.of(pepper));
-        when(shoppingListItemRepository.findByNameIgnoreCase("salt (volume)")).thenReturn(Optional.empty());
-        when(shoppingListItemRepository.findByNameIgnoreCase("pepper (pcs)")).thenReturn(Optional.empty());
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "salt")).thenReturn(Optional.of(salt));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "pepper")).thenReturn(Optional.of(pepper));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "salt (volume)")).thenReturn(Optional.empty());
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "pepper (pcs)")).thenReturn(Optional.empty());
 
         shoppingListService.removeIngredients(List.of(ingredient("salt", "1", "tsp"), ingredient("pepper", null, null)));
 
@@ -341,7 +349,7 @@ class ShoppingListServiceTest {
 
     @Test
     void removeIngredients_ignoresIngredientsNotOnTheList() {
-        when(shoppingListItemRepository.findByNameIgnoreCase("saffron")).thenReturn(Optional.empty());
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "saffron")).thenReturn(Optional.empty());
 
         shoppingListService.removeIngredients(List.of(ingredient("saffron", "1", "g")));
 
@@ -352,7 +360,7 @@ class ShoppingListServiceTest {
     @Test
     void addItem_convertsIncomingAmountIntoTheExistingUnit_forWeights() {
         ShoppingListItem sugar = listItem("sugar", "200", "g");
-        when(shoppingListItemRepository.findByNameIgnoreCase("sugar")).thenReturn(Optional.of(sugar));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "sugar")).thenReturn(Optional.of(sugar));
         when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListItem result = shoppingListService.addItem("sugar", BigDecimal.ONE, "kg");
@@ -364,7 +372,7 @@ class ShoppingListServiceTest {
     @Test
     void addItem_keepsTheExistingUnit_whenItIsTheLargerOne() {
         ShoppingListItem flour = listItem("flour", "1", "kg");
-        when(shoppingListItemRepository.findByNameIgnoreCase("flour")).thenReturn(Optional.of(flour));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "flour")).thenReturn(Optional.of(flour));
         when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListItem result = shoppingListService.addItem("flour", new BigDecimal("500"), "g");
@@ -376,7 +384,7 @@ class ShoppingListServiceTest {
     @Test
     void addItem_convertsWithinVolumeUnits() {
         ShoppingListItem milk = listItem("milk", "1", "cup");
-        when(shoppingListItemRepository.findByNameIgnoreCase("milk")).thenReturn(Optional.of(milk));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "milk")).thenReturn(Optional.of(milk));
         when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListItem result = shoppingListService.addItem("milk", new BigDecimal("473.176"), "ml");
@@ -388,7 +396,7 @@ class ShoppingListServiceTest {
     @Test
     void addItem_treatsMissingUnitAsPieces() {
         ShoppingListItem eggs = listItem("eggs", "2", null);
-        when(shoppingListItemRepository.findByNameIgnoreCase("eggs")).thenReturn(Optional.of(eggs));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "eggs")).thenReturn(Optional.of(eggs));
         when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListItem result = shoppingListService.addItem("eggs", new BigDecimal("3"), "pcs");
@@ -400,7 +408,7 @@ class ShoppingListServiceTest {
     @Test
     void addItem_treatsSingularAndPluralCountUnitsAsTheSame() {
         ShoppingListItem garlic = listItem("garlic", "2", "cloves");
-        when(shoppingListItemRepository.findByNameIgnoreCase("garlic")).thenReturn(Optional.of(garlic));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "garlic")).thenReturn(Optional.of(garlic));
         when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListItem result = shoppingListService.addItem("garlic", BigDecimal.ONE, "clove");
@@ -412,8 +420,8 @@ class ShoppingListServiceTest {
     @Test
     void addItem_putsIncompatibleUnitsInTheirOwnRow_insteadOfSummingThem() {
         ShoppingListItem onion = listItem("onion", "1", "pcs");
-        when(shoppingListItemRepository.findByNameIgnoreCase("onion")).thenReturn(Optional.of(onion));
-        when(shoppingListItemRepository.findByNameIgnoreCase("onion (weight)")).thenReturn(Optional.empty());
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "onion")).thenReturn(Optional.of(onion));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "onion (weight)")).thenReturn(Optional.empty());
         when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListItem result = shoppingListService.addItem("onion", new BigDecimal("200"), "g");
@@ -429,8 +437,8 @@ class ShoppingListServiceTest {
     void addItem_mergesIntoTheExistingVariantRow_andConvertsThere() {
         ShoppingListItem onion = listItem("onion", "1", "pcs");
         ShoppingListItem onionWeight = listItem("onion (weight)", "200", "g");
-        when(shoppingListItemRepository.findByNameIgnoreCase("onion")).thenReturn(Optional.of(onion));
-        when(shoppingListItemRepository.findByNameIgnoreCase("onion (weight)")).thenReturn(Optional.of(onionWeight));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "onion")).thenReturn(Optional.of(onion));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "onion (weight)")).thenReturn(Optional.of(onionWeight));
         when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListItem result = shoppingListService.addItem("onion", BigDecimal.ONE, "kg");
@@ -444,8 +452,8 @@ class ShoppingListServiceTest {
     @Test
     void addItem_putsWeightAgainstVolumeInItsOwnRow() {
         ShoppingListItem milk = listItem("milk", "1", "l");
-        when(shoppingListItemRepository.findByNameIgnoreCase("milk")).thenReturn(Optional.of(milk));
-        when(shoppingListItemRepository.findByNameIgnoreCase("milk (weight)")).thenReturn(Optional.empty());
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "milk")).thenReturn(Optional.of(milk));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "milk (weight)")).thenReturn(Optional.empty());
         when(shoppingListItemRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ShoppingListItem result = shoppingListService.addItem("milk", new BigDecimal("100"), "g");
@@ -457,8 +465,8 @@ class ShoppingListServiceTest {
     void removeIngredients_subtractsFromTheVariantRow_whenThePrimaryRowIsAnotherUnitFamily() {
         ShoppingListItem onion = listItem("onion", "1", "pcs");
         ShoppingListItem onionWeight = listItem("onion (weight)", "300", "g");
-        when(shoppingListItemRepository.findByNameIgnoreCase("onion")).thenReturn(Optional.of(onion));
-        when(shoppingListItemRepository.findByNameIgnoreCase("onion (weight)")).thenReturn(Optional.of(onionWeight));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "onion")).thenReturn(Optional.of(onion));
+        when(shoppingListItemRepository.findByUserIdAndNameIgnoreCase(USER_ID, "onion (weight)")).thenReturn(Optional.of(onionWeight));
 
         shoppingListService.removeIngredients(List.of(ingredient("onion", "100", "g")));
 

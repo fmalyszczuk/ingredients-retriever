@@ -7,6 +7,7 @@ import com.malyszczuk.ingredients_retriever.dto.IngredientRequest;
 import com.malyszczuk.ingredients_retriever.service.RecipeService;
 import com.malyszczuk.ingredients_retriever.service.ShoppingListService;
 import com.malyszczuk.ingredients_retriever.support.PostgresTestDatabase;
+import com.malyszczuk.ingredients_retriever.support.TestUsers;
 import com.malyszczuk.ingredients_retriever.support.RequiresDocker;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.WebApplicationType;
@@ -52,6 +53,7 @@ class RestartPersistenceIntegrationTest {
 
         // First run: create data.
         try (ConfigurableApplicationContext first = startApplication()) {
+            TestUsers.actAs(TestUsers.create(first.getBean(JdbcTemplate.class), "restart-" + tag + "@example.com"));
             ShoppingListService shoppingList = first.getBean(ShoppingListService.class);
             shoppingList.addItem(flour, new BigDecimal("200"), "g");
             shoppingList.addItem(flour, new BigDecimal("1"), "kg");
@@ -65,6 +67,8 @@ class RestartPersistenceIntegrationTest {
         // Second and third runs: the data must be exactly as left, and survive another start after that too.
         for (int run = 2; run <= 3; run++) {
             try (ConfigurableApplicationContext again = startApplication()) {
+                // the same account as before: the data belongs to it, and it was kept too
+                TestUsers.actAs(TestUsers.existing(again.getBean(JdbcTemplate.class), "restart-" + tag + "@example.com"));
                 List<ShoppingListItem> items = again.getBean(ShoppingListService.class).listItems().stream()
                         .filter(item -> item.getName().endsWith(tag))
                         .toList();
