@@ -36,6 +36,26 @@ public class AccountRecoveryService {
         mail.sendVerification(user.getEmail(), tokens.issue(user.getId(), TokenType.VERIFY_EMAIL, VERIFICATION_LIFETIME));
     }
 
+    /**
+     * Somebody signed up with an address that already has an account. Answers nothing to them; tells the owner by
+     * email. An account that never confirmed its address gets the new password (so that whoever signed up first with
+     * somebody else's address cannot leave their own password on it for the real owner to confirm) and a fresh link.
+     * The password is hashed in every case, so this takes as long as a real sign-up.
+     */
+    @Transactional
+    public void signedUpAgain(String normalizedEmail, String password) {
+        String hash = passwordEncoder.encode(password);
+        findUser(normalizedEmail).ifPresent(user -> {
+            if (user.isEmailVerified()) {
+                mail.sendAlreadyRegistered(user.getEmail());
+            } else {
+                user.setPasswordHash(hash);
+                userRepository.save(user);
+                sendVerification(user);
+            }
+        });
+    }
+
     /** Sends a new link if the address belongs to an account that still needs one. Silent otherwise. */
     @Transactional
     public void resendVerification(String email) {
@@ -80,6 +100,7 @@ public class AccountRecoveryService {
         user.setEmailVerified(true);
         userRepository.save(user);
         userSessions.endAll(user.getEmail(), null);
+        mail.sendPasswordChanged(user.getEmail());
     }
 
     private Optional<AppUser> findUser(String email) {

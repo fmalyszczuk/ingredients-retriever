@@ -224,7 +224,7 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
     @Test
     void register_thenLogin_givesAccessToTheApplication() throws Exception {
         String token = csrfToken();
-        assertEquals(201, mockMvc.perform(withCsrf(post("/auth/register").contentType(JSON)
+        assertEquals(202, mockMvc.perform(withCsrf(post("/auth/register").contentType(JSON)
                         .content("{\"email\": \"alice@example.com\", \"password\": \"" + PASSWORD + "\"}"), token))
                 .andReturn().getResponse().getStatus());
 

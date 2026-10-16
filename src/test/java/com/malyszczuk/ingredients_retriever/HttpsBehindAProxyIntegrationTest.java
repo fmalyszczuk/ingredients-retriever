@@ -85,7 +85,7 @@ class HttpsBehindAProxyIntegrationTest extends PostgresIntegrationTest {
         String token = browser.cookies().get("XSRF-TOKEN");
         Map<String, String> headers = Map.of("X-Forwarded-Proto", "https", "X-XSRF-TOKEN", token);
         jdbc.update("DELETE FROM users");
-        assertEquals(201, browser.send("POST", "/auth/register", credentials, headers).statusCode());
+        assertEquals(202, browser.send("POST", "/auth/register", credentials, headers).statusCode());
         jdbc.update("UPDATE users SET email_verified = true");
 
         HttpResponse<String> login = browser.send("POST", "/auth/login", credentials, Map.of("X-Forwarded-Proto", "https",

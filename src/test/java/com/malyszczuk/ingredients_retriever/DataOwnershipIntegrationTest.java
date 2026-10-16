@@ -44,7 +44,7 @@ class DataOwnershipIntegrationTest extends PostgresIntegrationTest {
         HttpBrowser browser = new HttpBrowser(port);
         String credentials = "{\"email\": \"" + email + "\", \"password\": \"" + PASSWORD + "\"}";
         browser.get("/auth/csrf");
-        assertEquals(201, browser.sendWithCsrf("POST", "/auth/register", credentials).statusCode());
+        assertEquals(202, browser.sendWithCsrf("POST", "/auth/register", credentials).statusCode());
         assertEquals(200, browser.sendWithCsrf("POST", "/auth/login", credentials).statusCode());
         return browser;
     }

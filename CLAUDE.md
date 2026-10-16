@@ -31,6 +31,8 @@ ingredients across recipes.
 - HTTPS: `pantrypal.security.require-https` (env PANTRYPAL_REQUIRE_HTTPS) refuses non-HTTPS requests (config.RequireHttpsFilter), implies
   Secure cookies and HSTS; config.HttpsSettingsCheck fails startup on settings that cannot work. Never trust X-Forwarded-*
   yourself: only through server.forward-headers-strategy=native (trusted proxies only), and use request.getRemoteAddr().
+- Sign-up must not reveal whether an address is registered: `auth.SignUpService` answers 202 either way and the owner is
+  told by email; keep the work (hashing, mail) the same on both paths. Password changes/resets send a notice email.
 - Email flows (verify, reset): tokens are single-use, hashed in the database and sent only through
   `mail.AccountMailService` (after commit, background thread, links from `pantrypal.public-url` never from the request).
   "Send me a link" endpoints answer 204 whatever the address, and share the AuthThrottle mail limits. Tests catch mail
@@ -54,3 +56,15 @@ ingredients across recipes.
 - DB tests use a real PostgreSQL via Testcontainers (skipped when Docker is unavailable).
 - Tests: JUnit 5 + Mockito, MockMvc for controllers
 - No paid APIs — Ollama only, or free tiers (Tavily/Brave for search)
+
+## Still missing (decided to postpone; do not forget)
+- **Changing the email address of an account.** There is no endpoint. Plan: POST with password + new address; a
+  confirmation link goes to the NEW address, a notice to the old one; the address only switches when the link is opened
+  (new token type + pending-email column); other sessions are logged out. Until then the only way is delete + re-register.
+- **Packaged deployment.** HTTPS is supported and documented (README, "Running over HTTPS", with a Caddy example) but there
+  is no Dockerfile or production compose file (backend + PostgreSQL + reverse proxy, secrets in `.env`). Do it once the
+  frontend exists, because the proxy config depends on how the frontend is built and served.
+- **Frontend** (`pantrypal-frontend`) does not know about any of the authentication work yet; the list of pages and
+  behaviours it needs is in the parent README, "Suggested frontend starting points", step 0.
+- Not planned, but known: counters for rate limiting and chat memory are in memory (lost on restart); the `__Host-` cookie
+  prefix is not used because it breaks plain `http://localhost` development.

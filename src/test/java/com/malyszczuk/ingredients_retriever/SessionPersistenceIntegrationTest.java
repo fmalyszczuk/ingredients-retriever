@@ -55,7 +55,7 @@ class SessionPersistenceIntegrationTest {
 
     private void registerAndLogIn(HttpBrowser browser, String email) throws Exception {
         browser.get("/auth/csrf");
-        assertEquals(201, browser.sendWithCsrf("POST", "/auth/register", json(email)).statusCode());
+        assertEquals(202, browser.sendWithCsrf("POST", "/auth/register", json(email)).statusCode());
         assertEquals(200, browser.sendWithCsrf("POST", "/auth/login", json(email)).statusCode());
     }
 

@@ -2,6 +2,7 @@ package com.malyszczuk.ingredients_retriever.auth;
 
 import com.malyszczuk.ingredients_retriever.domain.AppUser;
 import com.malyszczuk.ingredients_retriever.domain.TokenType;
+import com.malyszczuk.ingredients_retriever.mail.AccountMailService;
 import com.malyszczuk.ingredients_retriever.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,11 +45,14 @@ class AccountServiceTest {
     @Mock
     private AccountTokens tokens;
 
+    @Mock
+    private AccountMailService mail;
+
     private AccountService accountService;
 
     @BeforeEach
     void setUp() {
-        accountService = new AccountService(userRepository, passwordEncoder, new PasswordPolicy(), events, recovery, tokens);
+        accountService = new AccountService(userRepository, passwordEncoder, new PasswordPolicy(), events, recovery, tokens, mail);
     }
 
     @Test
@@ -139,6 +143,7 @@ class AccountServiceTest {
         assertEquals("{bcrypt}new", user.getPasswordHash());
         verify(userRepository).save(user);
         verify(tokens).invalidateAll(5L, TokenType.RESET_PASSWORD);
+        verify(mail).sendPasswordChanged("me@example.com");
     }
 
     @Test
@@ -147,6 +152,7 @@ class AccountServiceTest {
         when(passwordEncoder.matches("not the password", "{bcrypt}old")).thenReturn(false);
 
         assertThrows(WrongPasswordException.class, () -> accountService.changePassword(5L, "not the password", "a brand new passphrase"));
+        verifyNoInteractions(mail);
 
         assertEquals("{bcrypt}old", user.getPasswordHash());
         verify(userRepository, never()).save(any());

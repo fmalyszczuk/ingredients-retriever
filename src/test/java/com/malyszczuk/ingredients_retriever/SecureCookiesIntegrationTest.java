@@ -37,7 +37,7 @@ class SecureCookiesIntegrationTest extends PostgresIntegrationTest {
 
         // The browser would refuse to send Secure cookies back over http, so the test sends them by hand.
         String body = "{\"email\": \"alice@example.com\", \"password\": \"a very decent passphrase\"}";
-        assertEquals(201, browser.sendWithCsrf("POST", "/auth/register", body).statusCode());
+        assertEquals(202, browser.sendWithCsrf("POST", "/auth/register", body).statusCode());
         assertEquals(200, browser.sendWithCsrf("POST", "/auth/login", body).statusCode());
 
         String sessionCookie = browser.lastSetCookie("PANTRYPAL_SESSION");

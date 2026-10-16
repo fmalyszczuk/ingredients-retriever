@@ -50,7 +50,7 @@ class AccountManagementIntegrationTest extends PostgresIntegrationTest {
     private HttpBrowser register(String email) throws Exception {
         HttpBrowser browser = new HttpBrowser(port);
         browser.get("/auth/csrf");
-        assertEquals(201, browser.sendWithCsrf("POST", "/auth/register", credentials(email, OLD)).statusCode());
+        assertEquals(202, browser.sendWithCsrf("POST", "/auth/register", credentials(email, OLD)).statusCode());
         return browser;
     }
 

@@ -8,6 +8,7 @@ import com.malyszczuk.ingredients_retriever.auth.InvalidCredentialsException;
 import com.malyszczuk.ingredients_retriever.auth.LoginService;
 import com.malyszczuk.ingredients_retriever.config.SecurityConfig;
 import com.malyszczuk.ingredients_retriever.domain.AppUser;
+import com.malyszczuk.ingredients_retriever.auth.SignUpService;
 import com.malyszczuk.ingredients_retriever.auth.UserSessions;
 import com.malyszczuk.ingredients_retriever.auth.WrongPasswordException;
 import com.malyszczuk.ingredients_retriever.dto.ChangePasswordRequest;
@@ -15,6 +16,7 @@ import com.malyszczuk.ingredients_retriever.dto.DeleteAccountRequest;
 import com.malyszczuk.ingredients_retriever.dto.EmailRequest;
 import com.malyszczuk.ingredients_retriever.dto.LoginRequest;
 import com.malyszczuk.ingredients_retriever.dto.RegisterRequest;
+import com.malyszczuk.ingredients_retriever.dto.RegisterResponse;
 import com.malyszczuk.ingredients_retriever.dto.ResetPasswordRequest;
 import com.malyszczuk.ingredients_retriever.dto.TokenRequest;
 import com.malyszczuk.ingredients_retriever.dto.UserResponse;
@@ -48,17 +50,24 @@ public class AuthController {
     private final AuthThrottle authThrottle;
     private final UserSessions userSessions;
     private final AccountRecoveryService recoveryService;
+    private final SignUpService signUpService;
 
     // What logging out does, for when the account is deleted: the session is destroyed and the cookies expire.
     private final LogoutHandler logoutHandler = new CompositeLogoutHandler(new SecurityContextLogoutHandler(),
             new CookieClearingLogoutHandler(SecurityConfig.SESSION_COOKIE, SecurityConfig.CSRF_COOKIE));
 
+    /**
+     * Signs up. Answers 202 and the same body whether the address is new or already has an account: the owner is told by
+     * email which of the two it was, so that this endpoint cannot be used to find out who is registered.
+     */
     @PostMapping("/register")
-    @ResponseStatus(HttpStatus.CREATED)
-    public UserResponse register(@Valid @RequestBody RegisterRequest request, HttpServletRequest httpRequest) {
-        authThrottle.registrationAttempt(httpRequest.getRemoteAddr());
-        AppUser user = accountService.register(request.email(), request.password());
-        return new UserResponse(user.getId(), user.getEmail());
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public RegisterResponse register(@Valid @RequestBody RegisterRequest request, HttpServletRequest httpRequest) {
+        String address = httpRequest.getRemoteAddr();
+        authThrottle.registrationAttempt(address);
+        // every sign-up attempt makes the application send an email to the address, so it shares the email limits
+        authThrottle.mailRequest(address, AccountService.normalizeEmail(request.email()));
+        return new RegisterResponse(signUpService.signUp(request.email(), request.password()));
     }
 
     @PostMapping("/login")

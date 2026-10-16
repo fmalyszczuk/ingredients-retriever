@@ -108,7 +108,7 @@ class EmailFlowsIntegrationTest extends PostgresIntegrationTest {
     }
 
     private Mail register(String email) throws Exception {
-        assertEquals(201, browser().sendWithCsrf("POST", "/auth/register", credentials(email, PASSWORD)).statusCode());
+        assertEquals(202, browser().sendWithCsrf("POST", "/auth/register", credentials(email, PASSWORD)).statusCode());
         return nextMail();
     }
 
@@ -357,6 +357,104 @@ class EmailFlowsIntegrationTest extends PostgresIntegrationTest {
         assertEquals(204, known.statusCode());
         assertEquals(204, unknown.statusCode());
         assertEquals(known.body(), unknown.body());
+    }
+
+    // ---------------------------------------------------------------- signing up with an address that is taken
+
+    private HttpResponse<String> signUp(String email, String password) throws Exception {
+        return post("/auth/register", credentials(email, password));
+    }
+
+    @Test
+    void signingUpWithAConfirmedAddress_looksExactlyLikeSigningUpWithANewOne_andOnlyTheOwnerIsTold() throws Exception {
+        verifiedAccount("pam@example.com");
+        String hashBefore = jdbc.queryForObject("SELECT password_hash FROM users WHERE email = 'pam@example.com'", String.class);
+
+        HttpResponse<String> taken = signUp("pam@example.com", NEW_PASSWORD);
+        Mail notice = nextMail();
+        HttpResponse<String> fresh = signUp("pam2@example.com", NEW_PASSWORD);
+        Mail welcome = nextMail();
+
+        assertEquals(202, taken.statusCode());
+        assertEquals(fresh.statusCode(), taken.statusCode());
+        assertEquals(fresh.body().replace("pam2@", "pam@"), taken.body(), "same body apart from the address itself");
+        assertTrue(notice.subject().contains("Someone tried to sign up"), notice.subject());
+        assertEquals("pam@example.com", notice.to());
+        assertFalse(notice.body().contains("token="), "the notice carries no link that changes anything");
+        assertTrue(welcome.body().contains("verify-email?token="));
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM users WHERE email = 'pam@example.com'", Integer.class));
+        assertEquals(hashBefore, jdbc.queryForObject("SELECT password_hash FROM users WHERE email = 'pam@example.com'", String.class),
+                "the existing account's password is not touched by somebody else's sign-up");
+        assertEquals(200, login(browser(), "pam@example.com", PASSWORD).statusCode());
+    }
+
+    @Test
+    void aWeakPassword_isRefusedTheSameWay_whetherOrNotTheAddressIsTaken() throws Exception {
+        verifiedAccount("quinn@example.com");
+
+        HttpResponse<String> taken = signUp("quinn@example.com", "short");
+        HttpResponse<String> fresh = signUp("quinn2@example.com", "short");
+
+        assertEquals(400, taken.statusCode());
+        assertEquals(fresh.statusCode(), taken.statusCode());
+        assertEquals(fresh.body(), taken.body());
+        assertNoMail();
+    }
+
+    @Test
+    void whoeverSignedUpFirstWithSomebodyElsesAddress_cannotLeaveTheirPasswordOnIt() throws Exception {
+        String attackersFirstLink = register("rita@example.com").token(); // the attacker's password is PASSWORD
+
+        assertEquals(202, signUp("rita@example.com", NEW_PASSWORD).statusCode()); // the real owner signs up
+        String ownersLink = nextMail().token();
+
+        assertEquals(400, verify(attackersFirstLink).statusCode(), "the first link is dead");
+        assertEquals(204, verify(ownersLink).statusCode());
+        assertEquals(200, login(browser(), "rita@example.com", NEW_PASSWORD).statusCode());
+        assertEquals(401, login(browser(), "rita@example.com", PASSWORD).statusCode(), "the attacker's password is gone");
+    }
+
+    // ---------------------------------------------------------------- telling the owner about password changes
+
+    @Test
+    void changingThePassword_tellsTheOwnerByEmail() throws Exception {
+        verifiedAccount("sam@example.com");
+        HttpBrowser sam = browser();
+        login(sam, "sam@example.com", PASSWORD);
+
+        assertEquals(204, sam.sendWithCsrf("POST", "/auth/password",
+                "{\"currentPassword\": \"" + PASSWORD + "\", \"newPassword\": \"" + NEW_PASSWORD + "\"}").statusCode());
+
+        Mail notice = nextMail();
+        assertEquals("sam@example.com", notice.to());
+        assertTrue(notice.subject().contains("password was changed"), notice.subject());
+        assertFalse(notice.body().contains(NEW_PASSWORD) || notice.body().contains(PASSWORD));
+    }
+
+    @Test
+    void aFailedPasswordChange_sendsNoEmail() throws Exception {
+        verifiedAccount("tom@example.com");
+        HttpBrowser tom = browser();
+        login(tom, "tom@example.com", PASSWORD);
+
+        assertEquals(400, tom.sendWithCsrf("POST", "/auth/password",
+                "{\"currentPassword\": \"not the password\", \"newPassword\": \"" + NEW_PASSWORD + "\"}").statusCode());
+
+        assertNoMail();
+    }
+
+    @Test
+    void resettingThePassword_tellsTheOwnerByEmail() throws Exception {
+        verifiedAccount("uma@example.com");
+        forgot("uma@example.com");
+        String token = nextMail().token();
+
+        assertEquals(204, reset(token, NEW_PASSWORD).statusCode());
+
+        Mail notice = nextMail();
+        assertEquals("uma@example.com", notice.to());
+        assertTrue(notice.subject().contains("password was changed"), notice.subject());
+        assertFalse(notice.body().contains("token="));
     }
 
     // ---------------------------------------------------------------- the rest

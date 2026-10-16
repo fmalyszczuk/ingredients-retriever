@@ -2,6 +2,7 @@ package com.malyszczuk.ingredients_retriever.auth;
 
 import com.malyszczuk.ingredients_retriever.domain.AppUser;
 import com.malyszczuk.ingredients_retriever.domain.TokenType;
+import com.malyszczuk.ingredients_retriever.mail.AccountMailService;
 import com.malyszczuk.ingredients_retriever.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -23,6 +24,7 @@ public class AccountService {
     private final ApplicationEventPublisher events;
     private final AccountRecoveryService recovery;
     private final AccountTokens tokens;
+    private final AccountMailService mail;
 
     /** Email addresses are compared ignoring case and surrounding spaces, and stored in that normal form. */
     public static String normalizeEmail(String email) {
@@ -67,6 +69,7 @@ public class AccountService {
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         userRepository.save(user);
         tokens.invalidateAll(userId, TokenType.RESET_PASSWORD); // a reset link sent earlier must not undo this
+        mail.sendPasswordChanged(user.getEmail());
     }
 
     /**

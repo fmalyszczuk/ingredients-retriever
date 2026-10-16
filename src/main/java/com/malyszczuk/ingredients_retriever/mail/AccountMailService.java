@@ -56,6 +56,23 @@ public class AccountMailService {
                         + "your password has not been changed.");
     }
 
+    /** To an address that somebody tried to sign up with although it already has a (confirmed) account. */
+    public void sendAlreadyRegistered(String to) {
+        send(to, "Someone tried to sign up with your PantryPal email address",
+                "This email address already has a PantryPal account, so no new one was created.\n\n"
+                        + "If it was you, just log in: " + publicUrl + "/login\n"
+                        + "If you forgot your password, you can reset it here: " + publicUrl + "/forgot-password\n\n"
+                        + "If it was not you, you can ignore this email: nothing has changed.");
+    }
+
+    /** After a password change or reset, so that the owner finds out if it was somebody else. */
+    public void sendPasswordChanged(String to) {
+        send(to, "Your PantryPal password was changed",
+                "The password of your PantryPal account was just changed, and you were logged out of your other devices.\n\n"
+                        + "If it was you, there is nothing to do.\n"
+                        + "If it was not you, reset your password right away: " + publicUrl + "/forgot-password");
+    }
+
     private void send(String to, String subject, String body) {
         Runnable task = () -> {
             try {

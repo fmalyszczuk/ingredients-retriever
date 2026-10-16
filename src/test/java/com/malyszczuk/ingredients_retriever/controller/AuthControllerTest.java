@@ -6,6 +6,7 @@ import com.malyszczuk.ingredients_retriever.auth.AuthThrottle;
 import com.malyszczuk.ingredients_retriever.auth.EmailAlreadyRegisteredException;
 import com.malyszczuk.ingredients_retriever.auth.InvalidPasswordException;
 import com.malyszczuk.ingredients_retriever.auth.LoginService;
+import com.malyszczuk.ingredients_retriever.auth.SignUpService;
 import com.malyszczuk.ingredients_retriever.auth.UserSessions;
 import com.malyszczuk.ingredients_retriever.domain.AppUser;
 import com.malyszczuk.ingredients_retriever.dto.RegisterRequest;
@@ -50,6 +51,9 @@ class AuthControllerTest {
     @MockitoBean
     private AccountRecoveryService recoveryService;
 
+    @MockitoBean
+    private SignUpService signUpService;
+
     private String register(String email, String password) throws Exception {
         return mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -58,47 +62,44 @@ class AuthControllerTest {
     }
 
     @Test
-    void register_createsTheAccount_andNeverReturnsAnythingAboutThePassword() throws Exception {
-        when(accountService.register("me@example.com", "a decent passphrase"))
-                .thenReturn(AppUser.builder().id(7L).email("me@example.com").passwordHash("{bcrypt}$2a$12$secret-hash").build());
+    void register_answers202WithOnlyTheAddress_andNeverAnythingAboutThePassword() throws Exception {
+        when(signUpService.signUp("me@example.com", "a decent passphrase")).thenReturn("me@example.com");
 
         mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\": \"me@example.com\", \"password\": \"a decent passphrase\"}"))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(7))
+                .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.email").value("me@example.com"))
+                .andExpect(jsonPath("$.id").doesNotExist())
                 .andExpect(jsonPath("$.password").doesNotExist())
-                .andExpect(jsonPath("$.passwordHash").doesNotExist())
-                .andExpect(content().string(not(containsString("secret-hash"))))
                 .andExpect(content().string(not(containsString("passphrase"))));
     }
 
     @Test
     void register_trimsSurroundingSpacesFromTheEmail() throws Exception {
-        when(accountService.register("me@example.com", "a decent passphrase"))
-                .thenReturn(AppUser.builder().id(1L).email("me@example.com").build());
+        when(signUpService.signUp("me@example.com", "a decent passphrase")).thenReturn("me@example.com");
 
         mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\": \"  me@example.com \", \"password\": \"a decent passphrase\"}"))
-                .andExpect(status().isCreated());
+                .andExpect(status().isAccepted());
     }
 
     @Test
-    void register_answers409_whenTheEmailIsAlreadyTaken() throws Exception {
-        when(accountService.register("me@example.com", "a decent passphrase")).thenThrow(new EmailAlreadyRegisteredException());
+    void register_countsAgainstTheSignUpAndEmailLimits_beforeDoingAnything() throws Exception {
+        org.mockito.Mockito.doThrow(new com.malyszczuk.ingredients_retriever.auth.TooManyAttemptsException(java.time.Duration.ofMinutes(5)))
+                .when(authThrottle).registrationAttempt(org.mockito.ArgumentMatchers.any());
 
         mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\": \"me@example.com\", \"password\": \"a decent passphrase\"}"))
-                .andExpect(status().isConflict())
-                .andExpect(content().string(containsString("already exists")));
+                .andExpect(status().isTooManyRequests());
+        verifyNoInteractions(signUpService);
     }
 
     @Test
     void register_answers400WithTheReason_whenThePasswordIsNotAcceptable() throws Exception {
-        when(accountService.register("me@example.com", "password123")).thenThrow(new InvalidPasswordException("That password is too common or too easy to guess"));
+        when(signUpService.signUp("me@example.com", "password123")).thenThrow(new InvalidPasswordException("That password is too common or too easy to guess"));
 
         mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -127,7 +128,7 @@ class AuthControllerTest {
                     .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_PLAIN))
                     .andExpect(content().string(not(containsString("a decent passphrase"))));
         }
-        verifyNoInteractions(accountService);
+        verifyNoInteractions(signUpService);
     }
 
     @Test

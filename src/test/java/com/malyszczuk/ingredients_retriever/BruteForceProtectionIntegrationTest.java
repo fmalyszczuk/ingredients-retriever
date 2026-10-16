@@ -159,14 +159,14 @@ class BruteForceProtectionIntegrationTest extends PostgresIntegrationTest {
 
     @Test
     void signUps_areLimitedPerAddress_evenWhenTheyFail() throws Exception {
-        assertEquals(201, register("10.8.0.1", "new8a@example.com").getStatus());
-        assertEquals(409, register("10.8.0.1", "new8a@example.com").getStatus());
+        assertEquals(202, register("10.8.0.1", "new8a@example.com").getStatus());
+        assertEquals(202, register("10.8.0.1", "new8a@example.com").getStatus(), "an address that exists looks the same");
 
         MockHttpServletResponse blocked = register("10.8.0.1", "new8b@example.com");
 
         assertEquals(429, blocked.getStatus());
         assertNotNull(blocked.getHeader("Retry-After"));
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM users WHERE email = 'new8b@example.com'", Integer.class));
-        assertEquals(201, register("10.8.0.2", "new8b@example.com").getStatus());
+        assertEquals(202, register("10.8.0.2", "new8b@example.com").getStatus());
     }
 }

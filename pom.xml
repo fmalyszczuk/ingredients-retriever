@@ -156,6 +156,8 @@
 						<pantrypal.security.throttle.login-failures-per-address>1000</pantrypal.security.throttle.login-failures-per-address>
 						<pantrypal.security.throttle.login-failures-per-account>1000</pantrypal.security.throttle.login-failures-per-account>
 						<pantrypal.security.throttle.registrations-per-address>1000</pantrypal.security.throttle.registrations-per-address>
+						<pantrypal.security.throttle.mail-requests-per-address>1000</pantrypal.security.throttle.mail-requests-per-address>
+						<pantrypal.security.throttle.mail-requests-per-account>1000</pantrypal.security.throttle.mail-requests-per-account>
 					</systemPropertyVariables>
 				</configuration>
 			</plugin>

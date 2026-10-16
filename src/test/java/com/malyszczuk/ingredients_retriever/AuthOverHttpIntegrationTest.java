@@ -53,7 +53,7 @@ class AuthOverHttpIntegrationTest extends PostgresIntegrationTest {
 
     private void registerAndLogIn(String email) throws Exception {
         browser.get("/auth/csrf");
-        assertEquals(201, browser.sendWithCsrf("POST", "/auth/register", json(email, PASSWORD)).statusCode());
+        assertEquals(202, browser.sendWithCsrf("POST", "/auth/register", json(email, PASSWORD)).statusCode());
         assertEquals(200, browser.sendWithCsrf("POST", "/auth/login", json(email, PASSWORD)).statusCode());
     }
 
@@ -107,7 +107,7 @@ class AuthOverHttpIntegrationTest extends PostgresIntegrationTest {
     void aSessionIdPlantedByAnAttacker_isReplacedOnLogin_andNeverWorks() throws Exception {
         browser.get("/auth/csrf");
         browser.cookies().put("PANTRYPAL_SESSION", "planted-by-the-attacker");
-        assertEquals(201, browser.sendWithCsrf("POST", "/auth/register", json("carol@example.com", PASSWORD)).statusCode());
+        assertEquals(202, browser.sendWithCsrf("POST", "/auth/register", json("carol@example.com", PASSWORD)).statusCode());
 
         assertEquals(200, browser.sendWithCsrf("POST", "/auth/login", json("carol@example.com", PASSWORD)).statusCode());
 

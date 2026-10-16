@@ -9,6 +9,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -42,6 +43,29 @@ class AccountMailServiceTest {
         assertNotNull(mail);
         assertTrue(mail.body().contains("http://localhost:5173/reset-password?token=tok-456"), mail.body());
         assertTrue(mail.body().contains("1 hour"));
+    }
+
+    @Test
+    void theNoticeToAnExistingAccount_saysWhatToDo_withoutAnyLinkThatChangesAnything() throws Exception {
+        service("https://pantrypal.example.com").sendAlreadyRegistered("me@example.com");
+
+        Mail mail = sent.poll(5, TimeUnit.SECONDS);
+        assertNotNull(mail);
+        assertEquals("me@example.com", mail.to());
+        assertTrue(mail.body().contains("already has a PantryPal account"), mail.body());
+        assertTrue(mail.body().contains("https://pantrypal.example.com/forgot-password"), mail.body());
+        assertFalse(mail.body().contains("token="), "it carries no token");
+    }
+
+    @Test
+    void thePasswordChangedNotice_tellsHowToTakeTheAccountBack() throws Exception {
+        service("https://pantrypal.example.com").sendPasswordChanged("me@example.com");
+
+        Mail mail = sent.poll(5, TimeUnit.SECONDS);
+        assertNotNull(mail);
+        assertTrue(mail.subject().contains("password was changed"), mail.subject());
+        assertTrue(mail.body().contains("https://pantrypal.example.com/forgot-password"), mail.body());
+        assertFalse(mail.body().contains("token="));
     }
 
     @Test
