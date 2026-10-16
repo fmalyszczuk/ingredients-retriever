@@ -35,8 +35,10 @@ class RestartPersistenceIntegrationTest {
         PostgreSQLContainer postgres = PostgresTestDatabase.get();
         // Command-line arguments, not .properties(): those are only defaults, which application.properties overrides.
         return new SpringApplicationBuilder(IngredientsRetrieverApplication.class)
-                .web(WebApplicationType.NONE)
+                .web(WebApplicationType.SERVLET) // a real web app, like production; the security setup needs one
                 .run(
+                        "--server.port=0",
+                        "--pantrypal.security.bcrypt-strength=4",
                         "--spring.datasource.url=" + postgres.getJdbcUrl(),
                         "--spring.datasource.username=" + postgres.getUsername(),
                         "--spring.datasource.password=" + postgres.getPassword());

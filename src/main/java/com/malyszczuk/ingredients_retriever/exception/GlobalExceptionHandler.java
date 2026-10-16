@@ -1,6 +1,7 @@
 package com.malyszczuk.ingredients_retriever.exception;
 
 import com.malyszczuk.ingredients_retriever.auth.EmailAlreadyRegisteredException;
+import com.malyszczuk.ingredients_retriever.auth.InvalidCredentialsException;
 import com.malyszczuk.ingredients_retriever.extraction.RecipeExtractionException;
 import com.malyszczuk.ingredients_retriever.extraction.file.UnsupportedFileTypeException;
 import com.malyszczuk.ingredients_retriever.agent.OllamaResponseException;
@@ -36,6 +37,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RecipeExtractionException.class)
     public ResponseEntity<String> handleRecipeExtraction(RecipeExtractionException exception) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<String> handleInvalidCredentials(InvalidCredentialsException exception) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(exception.getMessage());
     }
 
     @ExceptionHandler(EmailAlreadyRegisteredException.class)

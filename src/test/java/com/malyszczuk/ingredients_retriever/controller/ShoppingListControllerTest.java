@@ -6,6 +6,7 @@ import com.malyszczuk.ingredients_retriever.dto.UpdateShoppingListItemRequest;
 import com.malyszczuk.ingredients_retriever.service.ShoppingListService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -27,7 +28,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+// Controller logic only: authentication is covered by SecurityIntegrationTest, which runs the real filter chain.
 @WebMvcTest(ShoppingListController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class ShoppingListControllerTest {
 
     @Autowired

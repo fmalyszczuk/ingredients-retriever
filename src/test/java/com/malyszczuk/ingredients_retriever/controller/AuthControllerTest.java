@@ -3,10 +3,12 @@ package com.malyszczuk.ingredients_retriever.controller;
 import com.malyszczuk.ingredients_retriever.auth.AccountService;
 import com.malyszczuk.ingredients_retriever.auth.EmailAlreadyRegisteredException;
 import com.malyszczuk.ingredients_retriever.auth.InvalidPasswordException;
+import com.malyszczuk.ingredients_retriever.auth.LoginService;
 import com.malyszczuk.ingredients_retriever.domain.AppUser;
 import com.malyszczuk.ingredients_retriever.dto.RegisterRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -22,7 +24,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+// Controller logic only: authentication is covered by SecurityIntegrationTest, which runs the real filter chain.
 @WebMvcTest(AuthController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class AuthControllerTest {
 
     @Autowired
@@ -30,6 +34,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private AccountService accountService;
+
+    @MockitoBean
+    private LoginService loginService;
 
     private String register(String email, String password) throws Exception {
         return mockMvc.perform(post("/auth/register")
