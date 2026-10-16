@@ -18,7 +18,7 @@ Frontend repo: https://github.com/fmalyszczuk/pantrypal-frontend
   list), from an uploaded file (PDF, DOCX, TXT, or a screenshot, photo or
   scanned PDF read by a local vision model), or type ingredients in by hand.
 - **Accounts and login**: sign up with an email and password, log in with a session
-  cookie (HttpOnly, SameSite, CSRF-protected). Every other endpoint is closed to
+  cookie (HttpOnly, SameSite, CSRF-protected) stored in PostgreSQL, so logins survive restarts. Every other endpoint is closed to
   anonymous users.
 - A merged shopping list that sums quantities for repeated ingredients,
   converting between compatible units (200 g + 1 kg = 1200 g) and keeping

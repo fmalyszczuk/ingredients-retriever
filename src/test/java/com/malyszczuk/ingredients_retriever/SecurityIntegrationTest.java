@@ -1,7 +1,6 @@
 package com.malyszczuk.ingredients_retriever;
 
 import com.malyszczuk.ingredients_retriever.auth.AccountService;
-import com.malyszczuk.ingredients_retriever.auth.AppUserPrincipal;
 import com.malyszczuk.ingredients_retriever.support.PostgresIntegrationTest;
 import com.malyszczuk.ingredients_retriever.support.RequiresDocker;
 import jakarta.servlet.http.Cookie;
@@ -12,10 +11,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.core.context.SecurityContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.RequestBuilder;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
@@ -61,6 +58,7 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
         jdbc.update("DELETE FROM ingredients");
         jdbc.update("DELETE FROM recipes");
         jdbc.update("DELETE FROM shopping_list_items");
+        jdbc.update("DELETE FROM spring_session");
         jdbc.update("DELETE FROM users");
     }
 
@@ -81,14 +79,36 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
         return request;
     }
 
-    private MockHttpSession logIn(String email, String password) throws Exception {
-        MockHttpSession session = new MockHttpSession();
+    /** Logs in and returns the session cookie, which is all a browser keeps. Sessions are stored in PostgreSQL. */
+    private Cookie logIn(String email, String password) throws Exception {
+        return logIn(email, password, null);
+    }
+
+    private Cookie logIn(String email, String password, Cookie existingSession) throws Exception {
         String token = csrfToken();
-        int status = mockMvc.perform(withCsrf(post("/auth/login").session(session).contentType(JSON)
-                        .content("{\"email\": \"" + email + "\", \"password\": \"" + password + "\"}"), token))
-                .andReturn().getResponse().getStatus();
-        assertEquals(200, status, "login should succeed");
-        return session;
+        MockHttpServletRequestBuilder login = post("/auth/login").contentType(JSON)
+                .content("{\"email\": \"" + email + "\", \"password\": \"" + password + "\"}");
+        if (existingSession != null) {
+            login.cookie(existingSession);
+        }
+        MockHttpServletResponse response = mockMvc.perform(withCsrf(login, token)).andReturn().getResponse();
+        assertEquals(200, response.getStatus(), "login should succeed");
+        String header = sessionCookieHeader(response);
+        assertNotNull(header, "login must set a session cookie");
+        int end = header.indexOf(';') > 0 ? header.indexOf(';') : header.length();
+        int equals = header.indexOf('=');
+        return new Cookie(header.substring(0, equals), header.substring(equals + 1, end));
+    }
+
+    /**
+     * The Set-Cookie header that starts a session (anything but the CSRF cookie), or null. Read from the raw header,
+     * because the session cookie is written as a header and response.getCookie() would be null whether or not one was
+     * set, which would make a "no session cookie" assertion pass for the wrong reason. MockMvc has no real web server,
+     * so the cookie is named SESSION here; its real name and flags (PANTRYPAL_SESSION, HttpOnly, SameSite) are checked
+     * in AuthOverHttpIntegrationTest.
+     */
+    private String sessionCookieHeader(MockHttpServletResponse response) {
+        return response.getHeaders("Set-Cookie").stream().filter(h -> !h.startsWith("XSRF-TOKEN=")).findFirst().orElse(null);
     }
 
     private record Endpoint(HttpMethod method, String path, String body) {
@@ -178,8 +198,7 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
         String token = csrfToken();
 
         MockHttpServletResponse response = mockMvc.perform(withCsrf(get("/shopping-list")
-                        .cookie(new Cookie("PANTRYPAL_SESSION", "not-a-real-session"))
-                        .session(new MockHttpSession()), token))
+                        .cookie(new Cookie("PANTRYPAL_SESSION", "not-a-real-session")), token))
                 .andReturn().getResponse();
 
         assertEquals(401, response.getStatus());
@@ -207,11 +226,11 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
                         .content("{\"email\": \"alice@example.com\", \"password\": \"" + PASSWORD + "\"}"), token))
                 .andReturn().getResponse().getStatus());
 
-        MockHttpSession session = logIn("alice@example.com", PASSWORD);
+        Cookie session = logIn("alice@example.com", PASSWORD);
 
-        assertEquals(200, mockMvc.perform(get("/shopping-list").session(session)).andReturn().getResponse().getStatus());
-        assertEquals(200, mockMvc.perform(get("/recipes").session(session)).andReturn().getResponse().getStatus());
-        assertEquals(201, mockMvc.perform(withCsrf(post("/shopping-list/items").session(session).contentType(JSON)
+        assertEquals(200, mockMvc.perform(get("/shopping-list").cookie(session)).andReturn().getResponse().getStatus());
+        assertEquals(200, mockMvc.perform(get("/recipes").cookie(session)).andReturn().getResponse().getStatus());
+        assertEquals(201, mockMvc.perform(withCsrf(post("/shopping-list/items").cookie(session).contentType(JSON)
                         .content("{\"name\": \"eggs\", \"quantity\": 2, \"unit\": \"pcs\"}"), token))
                 .andReturn().getResponse().getStatus());
     }
@@ -260,21 +279,21 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
         for (MockHttpServletResponse failure : failures) {
             assertEquals(401, failure.getStatus());
             assertEquals("Invalid email or password", failure.getContentAsString());
-            assertNull(failure.getCookie("PANTRYPAL_SESSION"));
+            assertNull(sessionCookieHeader(failure));
         }
     }
 
     @Test
-    void aFailedLogin_doesNotLogAnyoneIn() throws Exception {
+    void aFailedLogin_doesNotLogAnyoneIn_andCreatesNoSession() throws Exception {
         accountService.register("frank@example.com", PASSWORD);
-        MockHttpSession session = new MockHttpSession();
         String token = csrfToken();
 
-        mockMvc.perform(withCsrf(post("/auth/login").session(session).contentType(JSON)
-                .content("{\"email\": \"frank@example.com\", \"password\": \"wrong wrong wrong\"}"), token));
+        MockHttpServletResponse response = mockMvc.perform(withCsrf(post("/auth/login").contentType(JSON)
+                .content("{\"email\": \"frank@example.com\", \"password\": \"wrong wrong wrong\"}"), token)).andReturn().getResponse();
 
-        assertNull(session.getAttribute("SPRING_SECURITY_CONTEXT"));
-        assertEquals(401, mockMvc.perform(get("/shopping-list").session(session)).andReturn().getResponse().getStatus());
+        assertEquals(401, response.getStatus());
+        assertNull(sessionCookieHeader(response));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM spring_session", Integer.class));
     }
 
     @Test
@@ -290,31 +309,32 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
-    void login_startsAFreshSession_soAPlantedSessionIdIsUseless() throws Exception {
+    void login_startsAFreshSession_soAnIdFromBeforeTheLoginStopsWorking() throws Exception {
         accountService.register("heidi@example.com", PASSWORD);
-        MockHttpSession plantedByAnAttacker = new MockHttpSession();
-        plantedByAnAttacker.setAttribute("anything", "x");
-        String idBefore = plantedByAnAttacker.getId();
-        String token = csrfToken();
+        Cookie before = logIn("heidi@example.com", PASSWORD);
+        assertEquals(200, mockMvc.perform(get("/auth/me").cookie(before)).andReturn().getResponse().getStatus());
 
-        mockMvc.perform(withCsrf(post("/auth/login").session(plantedByAnAttacker).contentType(JSON)
-                .content("{\"email\": \"heidi@example.com\", \"password\": \"" + PASSWORD + "\"}"), token));
+        Cookie after = logIn("heidi@example.com", PASSWORD, before);
 
-        assertNotEquals(idBefore, plantedByAnAttacker.getId(), "the session id must change on login");
+        assertNotEquals(before.getValue(), after.getValue(), "the session id must change on login");
+        assertEquals(401, mockMvc.perform(get("/auth/me").cookie(before)).andReturn().getResponse().getStatus(),
+                "the old id must be dead, or a planted id would stay valid after the victim logs in");
+        assertEquals(200, mockMvc.perform(get("/auth/me").cookie(after)).andReturn().getResponse().getStatus());
     }
 
     @Test
-    void theSession_neverContainsThePasswordHash() throws Exception {
+    void theStoredSession_belongsToTheUser_andNeverContainsThePasswordHash() throws Exception {
         accountService.register("ivan@example.com", PASSWORD);
+        logIn("ivan@example.com", PASSWORD);
 
-        MockHttpSession session = logIn("ivan@example.com", PASSWORD);
+        assertEquals("ivan@example.com", jdbc.queryForObject("SELECT principal_name FROM spring_session", String.class));
+        byte[] stored = jdbc.queryForObject(
+                "SELECT attribute_bytes FROM spring_session_attributes WHERE attribute_name = 'SPRING_SECURITY_CONTEXT'", byte[].class);
+        String serialized = new String(stored, java.nio.charset.StandardCharsets.ISO_8859_1);
 
-        SecurityContext context = (SecurityContext) session.getAttribute("SPRING_SECURITY_CONTEXT");
-        assertNotNull(context);
-        AppUserPrincipal principal = (AppUserPrincipal) context.getAuthentication().getPrincipal();
-        assertEquals("ivan@example.com", principal.getEmail());
-        assertNull(principal.getPassword(), "credentials must be erased once the user is authenticated");
-        assertNull(context.getAuthentication().getCredentials());
+        assertTrue(serialized.contains("ivan@example.com"), "looking at the right bytes: the user's email is in there");
+        assertFalse(serialized.contains("$2a$") || serialized.contains("{bcrypt}"), "the password hash must never be stored in the session");
+        assertFalse(serialized.contains(PASSWORD));
     }
 
     // ---------------------------------------------------------------- who am I, and logging out
@@ -322,9 +342,9 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
     @Test
     void me_returnsTheLoggedInUser_and401WhenNobodyIs() throws Exception {
         accountService.register("judy@example.com", PASSWORD);
-        MockHttpSession session = logIn("judy@example.com", PASSWORD);
+        Cookie session = logIn("judy@example.com", PASSWORD);
 
-        MockHttpServletResponse loggedIn = mockMvc.perform(get("/auth/me").session(session)).andReturn().getResponse();
+        MockHttpServletResponse loggedIn = mockMvc.perform(get("/auth/me").cookie(session)).andReturn().getResponse();
         MockHttpServletResponse anonymous = mockMvc.perform(get("/auth/me")).andReturn().getResponse();
 
         assertEquals(200, loggedIn.getStatus());
@@ -335,25 +355,27 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
     @Test
     void logout_endsTheSession_forGood() throws Exception {
         accountService.register("kate@example.com", PASSWORD);
-        MockHttpSession session = logIn("kate@example.com", PASSWORD);
+        Cookie session = logIn("kate@example.com", PASSWORD);
         String token = csrfToken();
-        assertEquals(200, mockMvc.perform(get("/shopping-list").session(session)).andReturn().getResponse().getStatus());
+        assertEquals(200, mockMvc.perform(get("/shopping-list").cookie(session)).andReturn().getResponse().getStatus());
 
-        int status = mockMvc.perform(withCsrf(post("/auth/logout").session(session), token)).andReturn().getResponse().getStatus();
+        int status = mockMvc.perform(withCsrf(post("/auth/logout").cookie(session), token)).andReturn().getResponse().getStatus();
 
         assertEquals(204, status);
-        assertTrue(session.isInvalid(), "the server-side session must be destroyed, not just forgotten by the client");
-        assertEquals(401, mockMvc.perform(get("/shopping-list").session(session)).andReturn().getResponse().getStatus());
-        assertEquals(401, mockMvc.perform(get("/auth/me").session(session)).andReturn().getResponse().getStatus());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM spring_session", Integer.class),
+                "the server-side session must be destroyed, not just forgotten by the client");
+        assertEquals(401, mockMvc.perform(get("/shopping-list").cookie(session)).andReturn().getResponse().getStatus());
+        assertEquals(401, mockMvc.perform(get("/auth/me").cookie(session)).andReturn().getResponse().getStatus());
     }
 
     @Test
     void logout_needsACsrfToken_soAnotherSiteCannotLogYouOut() throws Exception {
         accountService.register("leo@example.com", PASSWORD);
-        MockHttpSession session = logIn("leo@example.com", PASSWORD);
+        Cookie session = logIn("leo@example.com", PASSWORD);
 
-        assertEquals(403, mockMvc.perform(post("/auth/logout").session(session)).andReturn().getResponse().getStatus());
-        assertFalse(session.isInvalid());
+        assertEquals(403, mockMvc.perform(post("/auth/logout").cookie(session)).andReturn().getResponse().getStatus());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM spring_session", Integer.class));
+        assertEquals(200, mockMvc.perform(get("/auth/me").cookie(session)).andReturn().getResponse().getStatus());
     }
 
     @Test
@@ -366,20 +388,20 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
     @Test
     void changes_needAValidCsrfToken_evenWhenLoggedIn() throws Exception {
         accountService.register("mallory@example.com", PASSWORD);
-        MockHttpSession session = logIn("mallory@example.com", PASSWORD);
+        Cookie session = logIn("mallory@example.com", PASSWORD);
         String token = csrfToken();
         String body = "{\"name\": \"eggs\", \"quantity\": 1, \"unit\": \"pcs\"}";
 
         // what a malicious page can do: the browser attaches the session cookie by itself, but it can't add the header
-        assertEquals(403, mockMvc.perform(post("/shopping-list/items").session(session).contentType(JSON).content(body)).andReturn().getResponse().getStatus());
+        assertEquals(403, mockMvc.perform(post("/shopping-list/items").cookie(session).contentType(JSON).content(body)).andReturn().getResponse().getStatus());
         // a made-up header that doesn't match the cookie
-        assertEquals(403, mockMvc.perform(post("/shopping-list/items").session(session).contentType(JSON).content(body)
+        assertEquals(403, mockMvc.perform(post("/shopping-list/items").cookie(session).contentType(JSON).content(body)
                 .cookie(new Cookie("XSRF-TOKEN", token)).header("X-XSRF-TOKEN", "forged")).andReturn().getResponse().getStatus());
         // a header without the cookie
-        assertEquals(403, mockMvc.perform(post("/shopping-list/items").session(session).contentType(JSON).content(body)
+        assertEquals(403, mockMvc.perform(post("/shopping-list/items").cookie(session).contentType(JSON).content(body)
                 .header("X-XSRF-TOKEN", token)).andReturn().getResponse().getStatus());
         // the right way
-        assertEquals(201, mockMvc.perform(withCsrf(post("/shopping-list/items").session(session).contentType(JSON).content(body), token))
+        assertEquals(201, mockMvc.perform(withCsrf(post("/shopping-list/items").cookie(session).contentType(JSON).content(body), token))
                 .andReturn().getResponse().getStatus());
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM shopping_list_items", Integer.class));
     }
@@ -387,9 +409,9 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
     @Test
     void readingNeedsNoCsrfToken() throws Exception {
         accountService.register("nina@example.com", PASSWORD);
-        MockHttpSession session = logIn("nina@example.com", PASSWORD);
+        Cookie session = logIn("nina@example.com", PASSWORD);
 
-        assertEquals(200, mockMvc.perform(get("/shopping-list").session(session)).andReturn().getResponse().getStatus());
+        assertEquals(200, mockMvc.perform(get("/shopping-list").cookie(session)).andReturn().getResponse().getStatus());
     }
 
     // ---------------------------------------------------------------- what the responses give away
@@ -397,9 +419,9 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
     @Test
     void responses_carrySecurityHeaders_andAreNeverCached() throws Exception {
         accountService.register("oscar@example.com", PASSWORD);
-        MockHttpSession session = logIn("oscar@example.com", PASSWORD);
+        Cookie session = logIn("oscar@example.com", PASSWORD);
 
-        MockHttpServletResponse response = mockMvc.perform(get("/auth/me").session(session)).andReturn().getResponse();
+        MockHttpServletResponse response = mockMvc.perform(get("/auth/me").cookie(session)).andReturn().getResponse();
 
         assertEquals("nosniff", response.getHeader("X-Content-Type-Options"));
         assertEquals("DENY", response.getHeader("X-Frame-Options"));
@@ -410,12 +432,12 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
     @Test
     void errors_neverShowStackTracesOrExceptionNames() throws Exception {
         accountService.register("peggy@example.com", PASSWORD);
-        MockHttpSession session = logIn("peggy@example.com", PASSWORD);
+        Cookie session = logIn("peggy@example.com", PASSWORD);
 
         for (MockHttpServletRequestBuilder request : List.<MockHttpServletRequestBuilder>of(
-                get("/does-not-exist").session(session),
-                get("/recipes/not-a-number").session(session),
-                get("/recipes/999999").session(session))) {
+                get("/does-not-exist").cookie(session),
+                get("/recipes/not-a-number").cookie(session),
+                get("/recipes/999999").cookie(session))) {
             String body = mockMvc.perform(request).andReturn().getResponse().getContentAsString();
 
             assertFalse(body.contains("Exception"), body);

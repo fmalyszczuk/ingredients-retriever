@@ -27,7 +27,7 @@ ingredients across recipes.
 - Authentication: the app is closed by default (SecurityConfig: `anyRequest().authenticated()`). Do not add
   `permitAll()` for anything except the /auth entry points without an explicit decision, and every new
   endpoint must be covered by SecurityIntegrationTest's endpoint list. Auth is a cookie session + CSRF token
-  (X-XSRF-TOKEN); passwords are BCrypt-hashed, never logged or returned; login failures must all look the same.
+  (X-XSRF-TOKEN), sessions stored in PostgreSQL (Flyway V3, Spring Session JDBC); passwords are BCrypt-hashed, never logged or returned; login failures must all look the same.
 - Security: the server must never fetch a user-supplied URL directly. Anything that takes a URL from a user, a
   recipe page or the LLM goes through net.SafePageFetcher / net.UrlGuard (SSRF protection: http(s) on ports 80/443
   only, public addresses only, DNS pinned to the checked addresses, redirects validated hop by hop, size/time limits).
