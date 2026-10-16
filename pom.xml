@@ -141,6 +141,20 @@
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<!-- Tests log in and register over and over from one address; the real limits would get in their way.
+					     BruteForceProtectionIntegrationTest sets its own, small ones on purpose. -->
+					<systemPropertyVariables>
+						<pantrypal.security.throttle.login-failures-per-address-and-account>1000</pantrypal.security.throttle.login-failures-per-address-and-account>
+						<pantrypal.security.throttle.login-failures-per-address>1000</pantrypal.security.throttle.login-failures-per-address>
+						<pantrypal.security.throttle.login-failures-per-account>1000</pantrypal.security.throttle.login-failures-per-account>
+						<pantrypal.security.throttle.registrations-per-address>1000</pantrypal.security.throttle.registrations-per-address>
+					</systemPropertyVariables>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
 				<executions>
 					<execution>

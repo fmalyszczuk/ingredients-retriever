@@ -1,6 +1,7 @@
 package com.malyszczuk.ingredients_retriever.controller;
 
 import com.malyszczuk.ingredients_retriever.auth.AccountService;
+import com.malyszczuk.ingredients_retriever.auth.AuthThrottle;
 import com.malyszczuk.ingredients_retriever.auth.EmailAlreadyRegisteredException;
 import com.malyszczuk.ingredients_retriever.auth.InvalidPasswordException;
 import com.malyszczuk.ingredients_retriever.auth.LoginService;
@@ -37,6 +38,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private LoginService loginService;
+
+    @MockitoBean
+    private AuthThrottle authThrottle;
 
     private String register(String email, String password) throws Exception {
         return mockMvc.perform(post("/auth/register")

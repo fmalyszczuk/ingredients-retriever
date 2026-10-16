@@ -2,6 +2,8 @@ package com.malyszczuk.ingredients_retriever.controller;
 
 import com.malyszczuk.ingredients_retriever.auth.AccountService;
 import com.malyszczuk.ingredients_retriever.auth.AppUserPrincipal;
+import com.malyszczuk.ingredients_retriever.auth.AuthThrottle;
+import com.malyszczuk.ingredients_retriever.auth.InvalidCredentialsException;
 import com.malyszczuk.ingredients_retriever.auth.LoginService;
 import com.malyszczuk.ingredients_retriever.domain.AppUser;
 import com.malyszczuk.ingredients_retriever.dto.LoginRequest;
@@ -29,17 +31,30 @@ public class AuthController {
 
     private final AccountService accountService;
     private final LoginService loginService;
+    private final AuthThrottle authThrottle;
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    public UserResponse register(@Valid @RequestBody RegisterRequest request) {
+    public UserResponse register(@Valid @RequestBody RegisterRequest request, HttpServletRequest httpRequest) {
+        authThrottle.registrationAttempt(httpRequest.getRemoteAddr());
         AppUser user = accountService.register(request.email(), request.password());
         return new UserResponse(user.getId(), user.getEmail());
     }
 
     @PostMapping("/login")
     public UserResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
-        AppUserPrincipal user = loginService.login(request.email(), request.password(), httpRequest, httpResponse);
+        String address = httpRequest.getRemoteAddr();
+        String account = AccountService.normalizeEmail(request.email());
+        // Refused before the password is even looked at, so a blocked guess is never told whether it was right.
+        authThrottle.checkLogin(address, account);
+        AppUserPrincipal user;
+        try {
+            user = loginService.login(request.email(), request.password(), httpRequest, httpResponse);
+        } catch (InvalidCredentialsException e) {
+            authThrottle.loginFailed(address, account);
+            throw e;
+        }
+        authThrottle.loginSucceeded(address, account);
         return new UserResponse(user.getId(), user.getEmail());
     }
 
