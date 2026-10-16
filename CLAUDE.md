@@ -53,6 +53,8 @@ ingredients across recipes.
   Never use Jsoup.connect(url), RestClient or HttpClient on such a URL.
 - Database: the schema is owned by Flyway (src/main/resources/db/migration). Hibernate is `ddl-auto=validate`
   only. Never edit an applied migration; add a new V<n>__*.sql. Entities must match the migration.
+- Dev database: spring-boot-docker-compose starts docker-compose.yml's db on `spring-boot:run` (off in tests; set
+  PANTRYPAL_AUTOSTART_DB=false for an external database / production, since the dependency is also in the packaged jar).
 - DB tests use a real PostgreSQL via Testcontainers (skipped when Docker is unavailable).
 - Tests: JUnit 5 + Mockito, MockMvc for controllers
 - No paid APIs — Ollama only, or free tiers (Tavily/Brave for search)

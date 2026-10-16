@@ -49,8 +49,8 @@ Requirements: Java 21, Docker (for the PostgreSQL database), and
 [Ollama](https://ollama.com) running locally if you want to use `/chat`.
 
 ```powershell
-# start PostgreSQL (data is kept in a Docker volume)
-docker compose up -d
+# PostgreSQL (data is kept in a Docker volume) is started by spring-boot:run itself when Docker is running.
+# To start it by hand instead: docker compose up -d   (and PANTRYPAL_AUTOSTART_DB=false to turn the automatic start off)
 
 # pull the model once, if you want the chat and from-text/from-file endpoints
 ollama pull llama3.2
