@@ -28,6 +28,9 @@ ingredients across recipes.
   `permitAll()` for anything except the /auth entry points without an explicit decision, and every new
   endpoint must be covered by SecurityIntegrationTest's endpoint list. Auth is a cookie session + CSRF token
   (X-XSRF-TOKEN), sessions stored in PostgreSQL (Flyway V3, Spring Session JDBC); passwords are BCrypt-hashed, never logged or returned; login failures must all look the same.
+- Sensitive account actions (change password, delete account) re-ask for the password, go through the same throttle as
+  login, and answer a wrong password with 400, never 401. Deleting an account relies on ON DELETE CASCADE for user data
+  and publishes AccountDeletedEvent (sessions, chats): new user-owned in-memory state must listen for it.
 - Brute force: `POST /auth/login` and `/auth/register` go through `auth.AuthThrottle` (429 + Retry-After). Keep the
   check before the password is verified, and keep every failure looking the same. Tests get generous limits from the
   surefire config in pom.xml; BruteForceProtectionIntegrationTest sets low ones.

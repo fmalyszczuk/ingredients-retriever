@@ -79,6 +79,12 @@ public class ConversationStore {
         }
     }
 
+    /** Forgets every conversation whose id starts with {@code prefix}. */
+    public synchronized void clearAllWithPrefix(String prefix) {
+        conversations.keySet().removeIf(id -> id.startsWith(prefix));
+        pendingConfirmations.keySet().removeIf(id -> id.startsWith(prefix));
+    }
+
     public synchronized void clear(String conversationId) {
         conversations.remove(conversationId);
         pendingConfirmations.remove(conversationId);

@@ -3,6 +3,7 @@ package com.malyszczuk.ingredients_retriever.exception;
 import com.malyszczuk.ingredients_retriever.auth.EmailAlreadyRegisteredException;
 import com.malyszczuk.ingredients_retriever.auth.InvalidCredentialsException;
 import com.malyszczuk.ingredients_retriever.auth.TooManyAttemptsException;
+import com.malyszczuk.ingredients_retriever.auth.WrongPasswordException;
 import com.malyszczuk.ingredients_retriever.extraction.RecipeExtractionException;
 import com.malyszczuk.ingredients_retriever.extraction.file.UnsupportedFileTypeException;
 import com.malyszczuk.ingredients_retriever.agent.OllamaResponseException;
@@ -43,6 +44,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<String> handleInvalidCredentials(InvalidCredentialsException exception) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(exception.getMessage());
+    }
+
+    @ExceptionHandler(WrongPasswordException.class)
+    public ResponseEntity<String> handleWrongPassword(WrongPasswordException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());
     }
 
     @ExceptionHandler(TooManyAttemptsException.class)

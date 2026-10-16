@@ -93,6 +93,8 @@ running (without it they are skipped).
 | `GET` | `/auth/csrf` | Get the CSRF token cookie — *open* |
 | `GET` | `/auth/me` | Who is logged in (401 if nobody) |
 | `POST` | `/auth/logout` | Log out |
+| `POST` | `/auth/password` | Change the password (needs the current one); ends the user's other sessions |
+| `POST` | `/auth/delete-account` | Delete the account and all its data (needs the password) |
 | `GET` | `/shopping-list` | List all shopping-list items |
 | `POST` | `/shopping-list/items` | Add an item (sums into an existing one by name) |
 | `PATCH` | `/shopping-list/items/{name}` | Update quantity, unit, or purchased status |

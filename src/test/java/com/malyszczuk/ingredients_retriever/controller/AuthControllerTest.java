@@ -5,6 +5,7 @@ import com.malyszczuk.ingredients_retriever.auth.AuthThrottle;
 import com.malyszczuk.ingredients_retriever.auth.EmailAlreadyRegisteredException;
 import com.malyszczuk.ingredients_retriever.auth.InvalidPasswordException;
 import com.malyszczuk.ingredients_retriever.auth.LoginService;
+import com.malyszczuk.ingredients_retriever.auth.UserSessions;
 import com.malyszczuk.ingredients_retriever.domain.AppUser;
 import com.malyszczuk.ingredients_retriever.dto.RegisterRequest;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private AuthThrottle authThrottle;
+
+    @MockitoBean
+    private UserSessions userSessions;
 
     private String register(String email, String password) throws Exception {
         return mockMvc.perform(post("/auth/register")

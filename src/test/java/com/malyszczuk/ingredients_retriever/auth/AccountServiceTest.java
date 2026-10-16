@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -32,11 +33,14 @@ class AccountServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private ApplicationEventPublisher events;
+
     private AccountService accountService;
 
     @BeforeEach
     void setUp() {
-        accountService = new AccountService(userRepository, passwordEncoder, new PasswordPolicy());
+        accountService = new AccountService(userRepository, passwordEncoder, new PasswordPolicy(), events);
     }
 
     @Test
@@ -84,5 +88,79 @@ class AccountServiceTest {
     void normalizeEmail_trimsAndLowerCases() {
         assertEquals("a@b.com", AccountService.normalizeEmail("  A@B.Com\t"));
         assertNull(AccountService.normalizeEmail(null));
+    }
+
+    // ---------------------------------------------------------------- changing the password and deleting the account
+
+    private AppUser existingUser() {
+        AppUser user = AppUser.builder().id(5L).email("me@example.com").passwordHash("{bcrypt}old").build();
+        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
+        return user;
+    }
+
+    @Test
+    void changePassword_storesAHashOfTheNewPassword_whenTheCurrentOneIsRight() {
+        AppUser user = existingUser();
+        when(passwordEncoder.matches("the old passphrase", "{bcrypt}old")).thenReturn(true);
+        when(passwordEncoder.matches("a brand new passphrase", "{bcrypt}old")).thenReturn(false);
+        when(passwordEncoder.encode("a brand new passphrase")).thenReturn("{bcrypt}new");
+
+        accountService.changePassword(5L, "the old passphrase", "a brand new passphrase");
+
+        assertEquals("{bcrypt}new", user.getPasswordHash());
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void changePassword_changesNothing_whenTheCurrentPasswordIsWrong() {
+        AppUser user = existingUser();
+        when(passwordEncoder.matches("not the password", "{bcrypt}old")).thenReturn(false);
+
+        assertThrows(WrongPasswordException.class, () -> accountService.changePassword(5L, "not the password", "a brand new passphrase"));
+
+        assertEquals("{bcrypt}old", user.getPasswordHash());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void changePassword_appliesThePasswordPolicy_toTheNewPassword() {
+        AppUser user = existingUser();
+        when(passwordEncoder.matches("the old passphrase", "{bcrypt}old")).thenReturn(true);
+
+        assertThrows(InvalidPasswordException.class, () -> accountService.changePassword(5L, "the old passphrase", "short"));
+
+        assertEquals("{bcrypt}old", user.getPasswordHash());
+    }
+
+    @Test
+    void changePassword_refusesTheSamePasswordAgain() {
+        existingUser();
+        when(passwordEncoder.matches("the old passphrase", "{bcrypt}old")).thenReturn(true);
+
+        assertThrows(InvalidPasswordException.class, () -> accountService.changePassword(5L, "the old passphrase", "the old passphrase"));
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void deleteAccount_deletesTheUser_andAnnouncesIt() {
+        AppUser user = existingUser();
+        when(passwordEncoder.matches("the old passphrase", "{bcrypt}old")).thenReturn(true);
+
+        accountService.deleteAccount(5L, "the old passphrase");
+
+        verify(userRepository).delete(user);
+        verify(events).publishEvent(new AccountDeletedEvent(5L, "me@example.com"));
+    }
+
+    @Test
+    void deleteAccount_deletesNothing_whenThePasswordIsWrong() {
+        existingUser();
+        when(passwordEncoder.matches("nope", "{bcrypt}old")).thenReturn(false);
+
+        assertThrows(WrongPasswordException.class, () -> accountService.deleteAccount(5L, "nope"));
+
+        verify(userRepository, never()).delete(any());
+        verifyNoInteractions(events);
     }
 }

@@ -148,6 +148,8 @@ class SecurityIntegrationTest extends PostgresIntegrationTest {
         endpoints.add(new Endpoint(HttpMethod.POST, "/chat", "{\"message\": \"hi\"}"));
         endpoints.add(new Endpoint(HttpMethod.DELETE, "/chat/abc", null));
         endpoints.add(new Endpoint(HttpMethod.GET, "/auth/me", null));
+        endpoints.add(new Endpoint(HttpMethod.POST, "/auth/password", "{\"currentPassword\": \"x\", \"newPassword\": \"y\"}"));
+        endpoints.add(new Endpoint(HttpMethod.POST, "/auth/delete-account", "{\"password\": \"x\"}"));
         endpoints.add(new Endpoint(HttpMethod.GET, "/", null));
         endpoints.add(new Endpoint(HttpMethod.GET, "/error", null));
         endpoints.add(new Endpoint(HttpMethod.GET, "/does-not-exist", null));
