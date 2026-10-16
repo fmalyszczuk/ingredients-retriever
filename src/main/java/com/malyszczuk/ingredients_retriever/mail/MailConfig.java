@@ -19,7 +19,9 @@ public class MailConfig {
 
     @Bean
     @ConditionalOnProperty("spring.mail.host")
-    public Mailer smtpMailer(JavaMailSender sender, @Value("${pantrypal.mail.from}") String from) {
+    public Mailer smtpMailer(JavaMailSender sender, @Value("${pantrypal.mail.from}") String from,
+                             @Value("${spring.mail.host}") String host, @Value("${spring.mail.port:25}") int port) {
+        log.info("Emails are sent through the SMTP server {}:{}, from {}", host, port, from);
         return (to, subject, body) -> {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(from);
