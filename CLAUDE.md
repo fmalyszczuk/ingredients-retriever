@@ -28,6 +28,9 @@ ingredients across recipes.
   `permitAll()` for anything except the /auth entry points without an explicit decision, and every new
   endpoint must be covered by SecurityIntegrationTest's endpoint list. Auth is a cookie session + CSRF token
   (X-XSRF-TOKEN), sessions stored in PostgreSQL (Flyway V3, Spring Session JDBC); passwords are BCrypt-hashed, never logged or returned; login failures must all look the same.
+- HTTPS: `pantrypal.security.require-https` (env PANTRYPAL_REQUIRE_HTTPS) refuses non-HTTPS requests (config.RequireHttpsFilter), implies
+  Secure cookies and HSTS; config.HttpsSettingsCheck fails startup on settings that cannot work. Never trust X-Forwarded-*
+  yourself: only through server.forward-headers-strategy=native (trusted proxies only), and use request.getRemoteAddr().
 - Email flows (verify, reset): tokens are single-use, hashed in the database and sent only through
   `mail.AccountMailService` (after commit, background thread, links from `pantrypal.public-url` never from the request).
   "Send me a link" endpoints answer 204 whatever the address, and share the AuthThrottle mail limits. Tests catch mail

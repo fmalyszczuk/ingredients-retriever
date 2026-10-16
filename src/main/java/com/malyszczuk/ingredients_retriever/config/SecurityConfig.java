@@ -26,6 +26,8 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfAuthenticationStrategy;
 import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
+import org.springframework.security.web.session.DisableEncodeUrlFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 
 import java.io.IOException;
 import java.util.List;
@@ -44,7 +46,13 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, CsrfTokenRepository csrfTokenRepository,
-                                                   SecurityContextRepository securityContextRepository) throws Exception {
+                                                   SecurityContextRepository securityContextRepository,
+                                                   @Value("${pantrypal.security.require-https:false}") boolean requireHttps) throws Exception {
+        if (requireHttps) {
+            // Plain-HTTP requests are refused before anything else happens. Behind a reverse proxy that terminates TLS,
+            // a request counts as secure through X-Forwarded-Proto (see PANTRYPAL_FORWARD_HEADERS).
+            http.addFilterBefore(new RequireHttpsFilter(), DisableEncodeUrlFilter.class);
+        }
         http
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.POST, "/auth/register", "/auth/login", "/auth/verify-email",
@@ -71,7 +79,10 @@ public class SecurityConfig {
                                 exception instanceof CsrfException ? "Missing or invalid CSRF token" : "Access denied")))
                 // The API only returns data, never pages: nothing may be framed, sniffed, or loaded from elsewhere.
                 .headers(headers -> headers
-                        .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'none'; frame-ancestors 'none'")))
+                        .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'none'; frame-ancestors 'none'"))
+                        // Sent on HTTPS responses only: from then on browsers refuse to talk to this site over plain HTTP. Not for subdomains: other sites on the same domain are not this application's to decide for.
+                        .httpStrictTransportSecurity(hsts -> hsts.maxAgeInSeconds(31_536_000).includeSubDomains(false))
+                        .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.NO_REFERRER)))
                 .cors(AbstractHttpConfigurer::disable);
         return http.build();
     }
