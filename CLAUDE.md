@@ -6,7 +6,7 @@ and produces a merged shopping list via a local LLM agent.
 
 ## Stack
 - Java 21, Maven, Spring Boot (latest stable)
-- Spring Web, Validation, Spring Data JPA, H2 (dev), DevTools
+- Spring Web, Validation, Spring Data JPA, PostgreSQL (docker-compose.yml for dev) with Flyway migrations, DevTools
 - Ollama (local, free) — llama3.2/qwen2.5 for text extraction & tool-calling
 - Jsoup for URL scraping, Apache POI/PDFBox for doc parsing, an Ollama vision
   model (gemma3:4b by default) for images instead of Tesseract OCR
@@ -28,5 +28,11 @@ ingredients across recipes.
   recipe page or the LLM goes through net.SafePageFetcher / net.UrlGuard (SSRF protection: http(s) on ports 80/443
   only, public addresses only, DNS pinned to the checked addresses, redirects validated hop by hop, size/time limits).
   Never use Jsoup.connect(url), RestClient or HttpClient on such a URL.
+- Database: the schema is owned by Flyway (src/main/resources/db/migration). Hibernate is `ddl-auto=validate`
+  only. Never edit an applied migration; add a new V<n>__*.sql. Entities must match the migration.
+- DB tests use a real PostgreSQL via Testcontainers (skipped when Docker is unavailable).
+- Database: the schema is owned by Flyway (src/main/resources/db/migration). Hibernate is `ddl-auto=validate`
+  only. Never edit an applied migration; add a new V<n>__*.sql. Entities must match the migration.
+- DB tests use a real PostgreSQL via Testcontainers (skipped when Docker is unavailable).
 - Tests: JUnit 5 + Mockito, MockMvc for controllers
 - No paid APIs — Ollama only, or free tiers (Tavily/Brave for search)

@@ -1,0 +1,25 @@
+# Local PostgreSQL for development: `docker compose up -d`.
+# The data lives in the named volume below, so it survives restarts of the app AND of this container.
+# `docker compose down` keeps it; `docker compose down -v` deletes it.
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: pantrypal-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pantrypal
+      POSTGRES_USER: ${PANTRYPAL_DB_USER:-pantrypal}
+      POSTGRES_PASSWORD: ${PANTRYPAL_DB_PASSWORD:-pantrypal}
+    ports:
+      # Only reachable from this machine.
+      - "127.0.0.1:${PANTRYPAL_DB_PORT:-5432}:5432"
+    volumes:
+      - pantrypal-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PANTRYPAL_DB_USER:-pantrypal} -d pantrypal"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pantrypal-db:

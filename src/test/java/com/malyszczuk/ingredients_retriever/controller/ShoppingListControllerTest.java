@@ -131,4 +131,26 @@ class ShoppingListControllerTest {
 
         verify(shoppingListService).clearItems();
     }
+
+    @Test
+    void addItem_returnsConflict_whenTheDatabaseRejectsTheChangeBecauseOfAConcurrentOne() throws Exception {
+        when(shoppingListService.addItem("eggs", BigDecimal.ONE, "pcs"))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate key"));
+
+        mockMvc.perform(post("/shopping-list/items")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new AddShoppingListItemRequest("eggs", BigDecimal.ONE, "pcs"))))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void updateItem_returnsConflict_whenTheDatabaseReportsADeadlock() throws Exception {
+        when(shoppingListService.updateItem(eq("eggs"), eq(true), isNull(), isNull()))
+                .thenThrow(new org.springframework.dao.CannotAcquireLockException("deadlock detected"));
+
+        mockMvc.perform(patch("/shopping-list/items/eggs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new UpdateShoppingListItemRequest(true, null, null))))
+                .andExpect(status().isConflict());
+    }
 }

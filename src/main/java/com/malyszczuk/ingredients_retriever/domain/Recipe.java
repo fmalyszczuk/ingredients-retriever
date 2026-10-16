@@ -43,6 +43,7 @@ public class Recipe {
     @Column(nullable = false)
     private RecipeSource sourceType;
 
+    @Column(length = 2048)
     private String sourceReference;
 
     @Builder.Default

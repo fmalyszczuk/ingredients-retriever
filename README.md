@@ -35,16 +35,19 @@ Frontend repo: https://github.com/fmalyszczuk/pantrypal-frontend
 ## Tech stack
 
 - Java 21, Maven, Spring Boot 4 (Spring Framework 7)
-- Spring Web, Validation, Spring Data JPA, H2 (in-memory dev database)
+- Spring Web, Validation, Spring Data JPA, PostgreSQL 17 with Flyway migrations
 - [Ollama](https://ollama.com) for local, free LLM tool-calling
 - Jsoup for recipe page scraping, Apache PDFBox and POI for reading uploaded PDF/DOCX files
 
 ## Getting started
 
-Requirements: Java 21, and [Ollama](https://ollama.com) running locally if
-you want to use `/chat`.
+Requirements: Java 21, Docker (for the PostgreSQL database), and
+[Ollama](https://ollama.com) running locally if you want to use `/chat`.
 
 ```powershell
+# start PostgreSQL (data is kept in a Docker volume)
+docker compose up -d
+
 # pull the model once, if you want the chat and from-text/from-file endpoints
 ollama pull llama3.2
 
@@ -55,16 +58,24 @@ ollama pull gemma3:4b
 .\mvnw.cmd spring-boot:run
 ```
 
-The API listens on `http://localhost:8080`. Data lives in an in-memory H2
-database, so it resets every time the app restarts — there's an H2 console
-at `http://localhost:8080/h2-console` if you want to poke around while it's
-running.
+The API listens on `http://localhost:8080`. Recipes and the shopping list are stored
+in PostgreSQL, so they **survive restarting the app and the database** (`docker compose
+down` keeps the data, `docker compose down -v` deletes it). The schema is created by
+Flyway migrations in `src/main/resources/db/migration`; to change it, add a new
+`V2__...sql` file rather than editing an applied one. The app will not start unless the
+database is reachable. Connection settings can be overridden with `PANTRYPAL_DB_URL`,
+`PANTRYPAL_DB_USER` and `PANTRYPAL_DB_PASSWORD` (the defaults are for local development
+only). To look inside:
+`docker exec -it pantrypal-db psql -U pantrypal -d pantrypal`.
 
 Run the tests with:
 
 ```powershell
 .\mvnw.cmd test
 ```
+
+The database tests start a throwaway PostgreSQL through Testcontainers, so they need Docker
+running (without it they are skipped).
 
 ## API overview
 

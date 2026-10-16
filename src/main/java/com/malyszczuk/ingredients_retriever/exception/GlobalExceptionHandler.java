@@ -3,6 +3,8 @@ package com.malyszczuk.ingredients_retriever.exception;
 import com.malyszczuk.ingredients_retriever.extraction.RecipeExtractionException;
 import com.malyszczuk.ingredients_retriever.extraction.file.UnsupportedFileTypeException;
 import com.malyszczuk.ingredients_retriever.agent.OllamaResponseException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -31,6 +33,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RecipeExtractionException.class)
     public ResponseEntity<String> handleRecipeExtraction(RecipeExtractionException exception) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(exception.getMessage());
+    }
+
+    // Two requests colliding in the database (the same new item added at the same moment, or a deadlock between
+    // overlapping recipe imports). The database stays consistent; the loser can simply be retried.
+    @ExceptionHandler({DataIntegrityViolationException.class, PessimisticLockingFailureException.class})
+    public ResponseEntity<String> handleConcurrentChange(RuntimeException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body("That change conflicts with another change made at the same moment. Please try again.");
     }
 
     @ExceptionHandler(UnsupportedFileTypeException.class)
