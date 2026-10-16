@@ -2,6 +2,10 @@ package com.malyszczuk.ingredients_retriever.extraction.url;
 
 import com.malyszczuk.ingredients_retriever.extraction.RecipeExtractionException;
 import lombok.RequiredArgsConstructor;
+import com.malyszczuk.ingredients_retriever.net.FetchedPage;
+import com.malyszczuk.ingredients_retriever.net.SafePageFetcher;
+import com.malyszczuk.ingredients_retriever.net.UnsafeUrlException;
+import com.malyszczuk.ingredients_retriever.net.UrlFetchException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -9,7 +13,9 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,7 +24,12 @@ import java.util.List;
 public class RecipeUrlScraper {
 
     private final ObjectMapper objectMapper;
+    private final SafePageFetcher pageFetcher;
 
+    /**
+     * @throws UnsafeUrlException if the URL, or a redirect it leads to, points somewhere the server must not fetch
+     *                            (answered as 400, not as an extraction failure)
+     */
     public RawRecipe scrape(String url) {
         return extract(fetch(url), url);
     }
@@ -40,13 +51,12 @@ public class RecipeUrlScraper {
 
     private Document fetch(String url) {
         try {
-            return Jsoup.connect(url)
-                    .userAgent("Mozilla/5.0 (compatible; PantryPalBot/1.0)")
-                    .timeout(10_000)
-                    .get();
-        } catch (IOException e) {
-            throw new RecipeExtractionException(
-                    "Could not fetch recipe page: " + url + " (" + e.getClass().getSimpleName() + ": " + e.getMessage() + ")", e);
+            FetchedPage page = pageFetcher.fetch(url);
+            Charset charset = page.charset();
+            return Jsoup.parse(new ByteArrayInputStream(page.body()), charset == null ? null : charset.name(),
+                    page.finalUrl().toString());
+        } catch (UrlFetchException | IOException e) {
+            throw new RecipeExtractionException("Could not fetch recipe page: " + url + " (" + e.getMessage() + ")", e);
         }
     }
 

@@ -12,7 +12,8 @@ Frontend repo: https://github.com/fmalyszczuk/pantrypal-frontend
 
 ## Features
 
-- Add recipes by URL (scrapes the page's `schema.org/Recipe` data), by dish
+- Add recipes by URL (scrapes the page's `schema.org/Recipe` data; URLs are
+  SSRF-checked, so internal addresses are refused), by dish
   name ("spaghetti carbonara" — the local LLM suggests a typical ingredient
   list), from an uploaded file (PDF, DOCX, TXT, or a screenshot, photo or
   scanned PDF read by a local vision model), or type ingredients in by hand.

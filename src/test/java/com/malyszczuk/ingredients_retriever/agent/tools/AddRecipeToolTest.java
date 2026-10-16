@@ -95,4 +95,17 @@ class AddRecipeToolTest {
         assertThrows(IllegalArgumentException.class, () -> tool.execute(Map.of()));
         verify(recipeService, never()).addRecipeFromText(any());
     }
+
+    @Test
+    void execute_letsAnUnsafeUrlFail_soTheModelIsToldItWasRefused() {
+        when(recipeService.addRecipeFromUrl("http://10.0.0.5/admin"))
+                .thenThrow(new com.malyszczuk.ingredients_retriever.net.UnsafeUrlException("The URL points to a private or internal network address, so it can't be fetched"));
+
+        com.malyszczuk.ingredients_retriever.net.UnsafeUrlException error = assertThrows(
+                com.malyszczuk.ingredients_retriever.net.UnsafeUrlException.class,
+                () -> tool.execute(Map.of("recipe", "http://10.0.0.5/admin")));
+
+        assertTrue(error.getMessage().contains("private or internal"));
+        verify(recipeService, never()).addRecipeFromText(any());
+    }
 }

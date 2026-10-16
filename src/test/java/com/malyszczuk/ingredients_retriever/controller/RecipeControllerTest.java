@@ -10,6 +10,7 @@ import com.malyszczuk.ingredients_retriever.domain.RecipeSource;
 import com.malyszczuk.ingredients_retriever.dto.CreateRecipeRequest;
 import com.malyszczuk.ingredients_retriever.dto.IngredientRequest;
 import com.malyszczuk.ingredients_retriever.extraction.RecipeExtractionException;
+import com.malyszczuk.ingredients_retriever.net.UnsafeUrlException;
 import com.malyszczuk.ingredients_retriever.extraction.file.UnsupportedFileTypeException;
 import com.malyszczuk.ingredients_retriever.service.RecipeService;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -233,5 +235,40 @@ class RecipeControllerTest {
 
         mockMvc.perform(delete("/recipes/9"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void addRecipeFromUrl_returnsBadRequest_whenTheUrlPointsAtAPrivateAddress() throws Exception {
+        when(recipeService.addRecipeFromUrl("http://169.254.169.254/latest/meta-data/"))
+                .thenThrow(new UnsafeUrlException("The URL points to a private or internal network address, so it can't be fetched"));
+
+        mockMvc.perform(post("/recipes/from-url")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"url\": \"http://169.254.169.254/latest/meta-data/\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("private or internal")));
+    }
+
+    @Test
+    void addRecipeFromUrl_returnsUnprocessable_whenThePageCannotBeFetched() throws Exception {
+        when(recipeService.addRecipeFromUrl("https://example.com/r"))
+                .thenThrow(new RecipeExtractionException("Could not fetch recipe page: https://example.com/r (The page answered with HTTP 403)"));
+
+        mockMvc.perform(post("/recipes/from-url")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"url\": \"https://example.com/r\"}"))
+                .andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
+    void addRecipeFromUrl_rejectsAnOversizedUrlBeforeAnythingElseHappens() throws Exception {
+        String huge = "https://example.com/" + "a".repeat(3000);
+
+        mockMvc.perform(post("/recipes/from-url")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"url\": \"" + huge + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        org.mockito.Mockito.verifyNoInteractions(recipeService);
     }
 }
