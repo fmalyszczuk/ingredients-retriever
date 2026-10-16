@@ -17,6 +17,10 @@ Frontend repo: https://github.com/fmalyszczuk/pantrypal-frontend
   name ("spaghetti carbonara" — the local LLM suggests a typical ingredient
   list), from an uploaded file (PDF, DOCX, TXT, or a screenshot, photo or
   scanned PDF read by a local vision model), or type ingredients in by hand.
+- **Accounts and login**: sign up with an email and password, log in with a session
+  cookie (HttpOnly, SameSite, CSRF-protected) stored in PostgreSQL, so logins survive restarts. Every other endpoint is closed to
+  anonymous users, and each user only ever sees their own recipes, shopping list and chats.
+  Repeated wrong passwords and mass sign-ups are rate limited (429). Sign-up answers the same whether or not the address is taken (the owner is told by email). Set `PANTRYPAL_REQUIRE_HTTPS=true` for any deployment (HTTPS only, Secure cookies, HSTS); details in the API reference README.
 - A merged shopping list that sums quantities for repeated ingredients,
   converting between compatible units (200 g + 1 kg = 1200 g) and keeping
   amounts that can't be added (1 pcs onion + 200 g onion) in separate rows.
@@ -79,8 +83,22 @@ running (without it they are skipped).
 
 ## API overview
 
+**Everything below needs a logged-in user** (anonymous requests get `401`), except the three endpoints marked *open*. Requests that change data must also send the CSRF token from the `XSRF-TOKEN` cookie in an `X-XSRF-TOKEN` header. Full details are in the project's API reference README. The app must be called from the same origin as the frontend (use a dev-server proxy); there is intentionally no CORS.
+
+
 | Method | Path | What it does |
 |---|---|---|
+| `POST` | `/auth/register` | Create an account (email + password) — *open* |
+| `POST` | `/auth/login` | Log in, sets the session cookie — *open* |
+| `GET` | `/auth/csrf` | Get the CSRF token cookie — *open* |
+| `GET` | `/auth/me` | Who is logged in (401 if nobody) |
+| `POST` | `/auth/verify-email` | Confirm an email address with the emailed token — *open* |
+| `POST` | `/auth/resend-verification` | Email the verification link again — *open* |
+| `POST` | `/auth/forgot-password` | Email a password reset link — *open* |
+| `POST` | `/auth/reset-password` | Set a new password with the emailed token — *open* |
+| `POST` | `/auth/logout` | Log out |
+| `POST` | `/auth/password` | Change the password (needs the current one); ends the user's other sessions |
+| `POST` | `/auth/delete-account` | Delete the account and all its data (needs the password) |
 | `GET` | `/shopping-list` | List all shopping-list items |
 | `POST` | `/shopping-list/items` | Add an item (sums into an existing one by name) |
 | `PATCH` | `/shopping-list/items/{name}` | Update quantity, unit, or purchased status |

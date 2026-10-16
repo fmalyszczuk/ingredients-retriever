@@ -1,9 +1,12 @@
 package com.malyszczuk.ingredients_retriever.agent;
 
 import com.malyszczuk.ingredients_retriever.agent.tools.AgentTool;
+import com.malyszczuk.ingredients_retriever.auth.AccountDeletedEvent;
+import com.malyszczuk.ingredients_retriever.auth.CurrentUser;
 import com.malyszczuk.ingredients_retriever.dto.ChatAction;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
@@ -43,8 +46,10 @@ public class ChatAgentService {
     private final List<AgentTool> agentTools;
     private final ObjectMapper objectMapper;
     private final ConversationStore conversationStore;
+    private final CurrentUser currentUser;
 
-    public ChatResult chat(String conversationId, String userMessage) {
+    public ChatResult chat(String clientConversationId, String userMessage) {
+        String conversationId = scoped(clientConversationId);
         Map<String, AgentTool> toolsByName = agentTools.stream()
                 .collect(Collectors.toMap(AgentTool::name, Function.identity()));
 
@@ -93,7 +98,23 @@ public class ChatAgentService {
     }
 
     public void forgetConversation(String conversationId) {
-        conversationStore.clear(conversationId);
+        conversationStore.clear(scoped(conversationId));
+    }
+
+    // Conversations belong to a user: the same id from two users is two different conversations, so nobody can read
+    // or continue (or confirm an action in) somebody else's by guessing its id.
+    private String scoped(String conversationId) {
+        return conversationPrefix(currentUser.id()) + conversationId;
+    }
+
+    private static String conversationPrefix(Long userId) {
+        return userId + ":";
+    }
+
+    /** A deleted account leaves no chats behind. */
+    @EventListener
+    public void onAccountDeleted(AccountDeletedEvent event) {
+        conversationStore.clearAllWithPrefix(conversationPrefix(event.userId()));
     }
 
     private String executeToolCall(Map<String, AgentTool> toolsByName, OllamaToolCall toolCall,

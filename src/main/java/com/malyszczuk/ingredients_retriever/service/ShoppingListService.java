@@ -1,5 +1,6 @@
 package com.malyszczuk.ingredients_retriever.service;
 
+import com.malyszczuk.ingredients_retriever.auth.CurrentUser;
 import com.malyszczuk.ingredients_retriever.domain.Ingredient;
 import com.malyszczuk.ingredients_retriever.domain.ShoppingListItem;
 import com.malyszczuk.ingredients_retriever.repository.ShoppingListItemRepository;
@@ -19,10 +20,11 @@ public class ShoppingListService {
 
     private final ShoppingListItemRepository shoppingListItemRepository;
     private final UnitConverter unitConverter;
+    private final CurrentUser currentUser;
 
     @Transactional(readOnly = true)
     public List<ShoppingListItem> listItems() {
-        return shoppingListItemRepository.findAll();
+        return shoppingListItemRepository.findAllByUserIdOrderById(currentUser.id());
     }
 
     @Transactional
@@ -40,10 +42,11 @@ public class ShoppingListService {
         }
 
         String normalizedUnit = normalize(unit);
-        Optional<ShoppingListItem> existing = shoppingListItemRepository.findByNameIgnoreCase(normalizedName);
+        Optional<ShoppingListItem> existing = shoppingListItemRepository.findByUserIdAndNameIgnoreCase(currentUser.id(), normalizedName);
 
         if (existing.isEmpty()) {
             return shoppingListItemRepository.save(ShoppingListItem.builder()
+                    .userId(currentUser.id())
                     .name(normalizedName)
                     .quantity(quantity)
                     .unit(normalizedUnit)
@@ -74,7 +77,7 @@ public class ShoppingListService {
 
     @Transactional
     public ShoppingListItem updateItem(String name, Boolean purchased, BigDecimal quantity, String unit) {
-        ShoppingListItem item = shoppingListItemRepository.findByNameIgnoreCase(normalize(name))
+        ShoppingListItem item = shoppingListItemRepository.findByUserIdAndNameIgnoreCase(currentUser.id(), normalize(name))
                 .orElseThrow(() -> new NoSuchElementException("No shopping list item named '" + name + "'"));
 
         if (purchased != null) {
@@ -102,7 +105,7 @@ public class ShoppingListService {
 
     @Transactional
     public ShoppingListItem convertItemUnit(String name, String targetUnit) {
-        ShoppingListItem item = shoppingListItemRepository.findByNameIgnoreCase(normalize(name))
+        ShoppingListItem item = shoppingListItemRepository.findByUserIdAndNameIgnoreCase(currentUser.id(), normalize(name))
                 .orElseThrow(() -> new NoSuchElementException("No shopping list item named '" + name + "'"));
 
         if (item.getQuantity() == null || item.getUnit() == null) {
@@ -121,7 +124,7 @@ public class ShoppingListService {
 
     @Transactional
     public void removeItem(String name) {
-        shoppingListItemRepository.findByNameIgnoreCase(normalize(name))
+        shoppingListItemRepository.findByUserIdAndNameIgnoreCase(currentUser.id(), normalize(name))
                 .ifPresent(shoppingListItemRepository::delete);
     }
 
@@ -155,17 +158,17 @@ public class ShoppingListService {
 
     /** The row {@link #addItem} would have merged an ingredient with this name and unit into, if there is one. */
     private Optional<ShoppingListItem> findMatching(String name, String unit) {
-        Optional<ShoppingListItem> primary = shoppingListItemRepository.findByNameIgnoreCase(name);
+        Optional<ShoppingListItem> primary = shoppingListItemRepository.findByUserIdAndNameIgnoreCase(currentUser.id(), name);
         if (primary.isPresent() && sameKind(primary.get().getUnit(), unit)) {
             return primary;
         }
-        return shoppingListItemRepository.findByNameIgnoreCase(variantName(name, unit))
+        return shoppingListItemRepository.findByUserIdAndNameIgnoreCase(currentUser.id(), variantName(name, unit))
                 .filter(variant -> sameKind(variant.getUnit(), unit));
     }
 
     @Transactional
     public void clearItems() {
-        shoppingListItemRepository.deleteAll();
+        shoppingListItemRepository.deleteAllByUserId(currentUser.id());
     }
 
     /** Two units can share a row when one converts to the other (same weight/volume family) or both count the same thing. */

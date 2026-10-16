@@ -15,6 +15,7 @@ import com.malyszczuk.ingredients_retriever.extraction.file.UnsupportedFileTypeE
 import com.malyszczuk.ingredients_retriever.service.RecipeService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
@@ -37,7 +38,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+// Controller logic only: authentication is covered by SecurityIntegrationTest, which runs the real filter chain.
 @WebMvcTest(RecipeController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class RecipeControllerTest {
 
     @Autowired

@@ -1,5 +1,10 @@
 package com.malyszczuk.ingredients_retriever.exception;
 
+import com.malyszczuk.ingredients_retriever.auth.EmailAlreadyRegisteredException;
+import com.malyszczuk.ingredients_retriever.auth.EmailNotVerifiedException;
+import com.malyszczuk.ingredients_retriever.auth.InvalidCredentialsException;
+import com.malyszczuk.ingredients_retriever.auth.TooManyAttemptsException;
+import com.malyszczuk.ingredients_retriever.auth.WrongPasswordException;
 import com.malyszczuk.ingredients_retriever.extraction.RecipeExtractionException;
 import com.malyszczuk.ingredients_retriever.extraction.file.UnsupportedFileTypeException;
 import com.malyszczuk.ingredients_retriever.agent.OllamaResponseException;
@@ -7,6 +12,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.client.ResourceAccessException;
@@ -16,6 +22,7 @@ import java.net.SocketTimeoutException;
 import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpTimeoutException;
 import java.util.NoSuchElementException;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -33,6 +40,44 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RecipeExtractionException.class)
     public ResponseEntity<String> handleRecipeExtraction(RecipeExtractionException exception) {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<String> handleInvalidCredentials(InvalidCredentialsException exception) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(exception.getMessage());
+    }
+
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    public ResponseEntity<String> handleEmailNotVerified(EmailNotVerifiedException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(exception.getMessage());
+    }
+
+    @ExceptionHandler(WrongPasswordException.class)
+    public ResponseEntity<String> handleWrongPassword(WrongPasswordException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());
+    }
+
+    @ExceptionHandler(TooManyAttemptsException.class)
+    public ResponseEntity<String> handleTooManyAttempts(TooManyAttemptsException exception) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(exception.retryAfterSeconds()))
+                .body(exception.getMessage());
+    }
+
+    @ExceptionHandler(EmailAlreadyRegisteredException.class)
+    public ResponseEntity<String> handleEmailAlreadyRegistered(EmailAlreadyRegisteredException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(exception.getMessage());
+    }
+
+    // Plain text like every other error, naming the fields that were wrong. It never echoes the rejected values
+    // (they may be passwords), and replaces Spring's default JSON error body, which can include a stack trace.
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<String> handleValidation(MethodArgumentNotValidException exception) {
+        String problems = exception.getBindingResult().getFieldErrors().stream()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .sorted()
+                .collect(Collectors.joining("; "));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(problems.isEmpty() ? "The request is not valid" : problems);
     }
 
     // Two requests colliding in the database (the same new item added at the same moment, or a deadlock between

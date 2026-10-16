@@ -36,6 +36,10 @@ public class Recipe {
     @EqualsAndHashCode.Include
     private Long id;
 
+    /** The owner. Every query is scoped by it, see RecipeRepository. */
+    @Column(nullable = false, updatable = false)
+    private Long userId;
+
     @Column(nullable = false)
     private String title;
 

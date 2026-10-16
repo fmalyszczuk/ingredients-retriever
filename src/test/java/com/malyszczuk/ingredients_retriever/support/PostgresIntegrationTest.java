@@ -6,7 +6,8 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /** Base for tests that run the whole application against a real PostgreSQL. Subclasses add {@link RequiresDocker}. */
-@SpringBootTest
+// A low BCrypt work factor keeps the tests fast; production uses 12 (see PasswordConfig).
+@SpringBootTest(properties = "pantrypal.security.bcrypt-strength=4")
 public abstract class PostgresIntegrationTest {
 
     @DynamicPropertySource

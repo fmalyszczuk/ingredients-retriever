@@ -24,6 +24,29 @@ ingredients across recipes.
 - GET  /shopping-list
 
 ## Conventions
+- Authentication: the app is closed by default (SecurityConfig: `anyRequest().authenticated()`). Do not add
+  `permitAll()` for anything except the /auth entry points without an explicit decision, and every new
+  endpoint must be covered by SecurityIntegrationTest's endpoint list. Auth is a cookie session + CSRF token
+  (X-XSRF-TOKEN), sessions stored in PostgreSQL (Flyway V3, Spring Session JDBC); passwords are BCrypt-hashed, never logged or returned; login failures must all look the same.
+- HTTPS: `pantrypal.security.require-https` (env PANTRYPAL_REQUIRE_HTTPS) refuses non-HTTPS requests (config.RequireHttpsFilter), implies
+  Secure cookies and HSTS; config.HttpsSettingsCheck fails startup on settings that cannot work. Never trust X-Forwarded-*
+  yourself: only through server.forward-headers-strategy=native (trusted proxies only), and use request.getRemoteAddr().
+- Sign-up must not reveal whether an address is registered: `auth.SignUpService` answers 202 either way and the owner is
+  told by email; keep the work (hashing, mail) the same on both paths. Password changes/resets send a notice email.
+- Email flows (verify, reset): tokens are single-use, hashed in the database and sent only through
+  `mail.AccountMailService` (after commit, background thread, links from `pantrypal.public-url` never from the request).
+  "Send me a link" endpoints answer 204 whatever the address, and share the AuthThrottle mail limits. Tests catch mail
+  with a `@Primary Mailer`; pom's surefire config switches verification off for the other tests.
+- Sensitive account actions (change password, delete account) re-ask for the password, go through the same throttle as
+  login, and answer a wrong password with 400, never 401. Deleting an account relies on ON DELETE CASCADE for user data
+  and publishes AccountDeletedEvent (sessions, chats): new user-owned in-memory state must listen for it.
+- Brute force: `POST /auth/login` and `/auth/register` go through `auth.AuthThrottle` (429 + Retry-After). Keep the
+  check before the password is verified, and keep every failure looking the same. Tests get generous limits from the
+  surefire config in pom.xml; BruteForceProtectionIntegrationTest sets low ones.
+- Data ownership: recipes and shopping list items belong to a user (user_id, migration V4). Every repository query is
+  scoped by the owner via `CurrentUser.id()`; never fetch by id alone or `findAll()`. Someone else's row looks like a
+  missing one (404). Chat conversation ids are namespaced by user. New user-owned data needs a user_id column and a
+  case in DataOwnershipIntegrationTest.
 - Security: the server must never fetch a user-supplied URL directly. Anything that takes a URL from a user, a
   recipe page or the LLM goes through net.SafePageFetcher / net.UrlGuard (SSRF protection: http(s) on ports 80/443
   only, public addresses only, DNS pinned to the checked addresses, redirects validated hop by hop, size/time limits).
@@ -31,8 +54,17 @@ ingredients across recipes.
 - Database: the schema is owned by Flyway (src/main/resources/db/migration). Hibernate is `ddl-auto=validate`
   only. Never edit an applied migration; add a new V<n>__*.sql. Entities must match the migration.
 - DB tests use a real PostgreSQL via Testcontainers (skipped when Docker is unavailable).
-- Database: the schema is owned by Flyway (src/main/resources/db/migration). Hibernate is `ddl-auto=validate`
-  only. Never edit an applied migration; add a new V<n>__*.sql. Entities must match the migration.
-- DB tests use a real PostgreSQL via Testcontainers (skipped when Docker is unavailable).
 - Tests: JUnit 5 + Mockito, MockMvc for controllers
 - No paid APIs — Ollama only, or free tiers (Tavily/Brave for search)
+
+## Still missing (decided to postpone; do not forget)
+- **Changing the email address of an account.** There is no endpoint. Plan: POST with password + new address; a
+  confirmation link goes to the NEW address, a notice to the old one; the address only switches when the link is opened
+  (new token type + pending-email column); other sessions are logged out. Until then the only way is delete + re-register.
+- **Packaged deployment.** HTTPS is supported and documented (README, "Running over HTTPS", with a Caddy example) but there
+  is no Dockerfile or production compose file (backend + PostgreSQL + reverse proxy, secrets in `.env`). Do it once the
+  frontend exists, because the proxy config depends on how the frontend is built and served.
+- **Frontend** (`pantrypal-frontend`) does not know about any of the authentication work yet; the list of pages and
+  behaviours it needs is in the parent README, "Suggested frontend starting points", step 0.
+- Not planned, but known: counters for rate limiting and chat memory are in memory (lost on restart); the `__Host-` cookie
+  prefix is not used because it breaks plain `http://localhost` development.
